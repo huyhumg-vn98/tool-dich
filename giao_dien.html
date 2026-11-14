@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dịch Video</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e3df;
+    --accent: #d9480f; --accent-ink: #ffffff; --ok: #2b8a3e; --warn: #b7791f; --err: #c92a2a; --run: #1c6dd0;
+    --chip-bg: #f1f0ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615; --card: #1f1f1d; --text: #ececea; --muted: #9a9a94; --line: #2f2f2c;
+      --accent: #ff7a3d; --accent-ink: #1a0d05; --ok: #69db7c; --warn: #fcc419; --err: #ff8787; --run: #74b0ff;
+      --chip-bg: #2a2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+  textarea, select { width: 100%; font: inherit; color: var(--text); background: var(--bg);
+                     border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  textarea { min-height: 96px; resize: vertical; }
+  input[type=password], input:not([type]) { font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; width: 100%; }
+  summary { cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '▸ '; color: var(--muted); }
+  details[open] summary::before { content: '▾ '; }
+  .luoi { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .gv { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line);
+        border-radius: 10px; background: var(--bg); }
+  .gv .nm { flex: 1; min-width: 0; }
+  .gv .name { font-size: 14px; }
+  .gv .sub { font-size: 12px; }
+  .gv .row { gap: 6px; }
+  .phan-trang { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+  button:disabled { opacity: .4; cursor: default; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--chip-bg); display: inline-flex; gap: 6px; align-items: center; }
+  .tag button { border: 0; background: none; padding: 0; color: var(--muted); cursor: pointer; }
+  textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 12px 0; }
+  label.f { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+           border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.sm { padding: 4px 10px; font-size: 13px; }
+  .drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 10px 14px; color: var(--muted);
+          font-size: 14px; cursor: pointer; flex: 1; min-width: 200px; text-align: center; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  .msg { font-size: 13px; color: var(--muted); min-height: 1.2em; margin-top: 8px; }
+  .job { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .job:first-child { border-top: 0; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .sub.err { color: var(--err); }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
+          background: var(--chip-bg); white-space: nowrap; }
+  .chip.run { color: var(--run); } .chip.ok { color: var(--ok); } .chip.err { color: var(--err); }
+  .chip.wait { color: var(--muted); } .chip.edit { color: var(--warn); }
+  .acts { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { color: var(--muted); text-align: center; padding: 20px 0; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+         margin-right: 5px; animation: p 1.2s infinite; vertical-align: 1px; }
+  @keyframes p { 50% { opacity: .25; } }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text);
+           width: min(760px, calc(100vw - 32px)); max-height: 86vh; padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dh { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .db { padding: 12px 18px; overflow: auto; max-height: calc(86vh - 140px); }
+  .df { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .blk { margin-bottom: 10px; }
+  .blk.gia textarea { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+  .blk.gia .tg, .sub.gia { color: var(--warn); font-weight: 600; }
+  button.warnbtn { background: var(--warn); color: #1a1205; border-color: var(--warn); }
+  .blk .tg { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .blk textarea { min-height: 0; height: auto; padding: 7px 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dịch Video → Tiếng Việt</h1>
+    <button onclick="post('/api/open_folder')">Mở thư mục kết quả</button>
+    <button onclick="post('/api/open_chu_de')" title="Mỗi chủ đề 1 thư mục con, bỏ file .txt chứa link vào - tool tự dịch lần lượt, video ra nằm ở Video_Ra/<chủ đề>">Thư mục chủ đề</button>
+  </header>
+
+  <section class="card">
+    <h2>Thêm video</h2>
+    <textarea id="links" placeholder="Dán link Douyin vào đây (nhiều link, hoặc nguyên đoạn chia sẻ có chữ Trung đều được)"></textarea>
+    <div class="opts">
+      <div><label class="f" for="giong">Giọng lồng tiếng</label><select id="giong"></select></div>
+      <div><label class="f" for="toc_do">Tốc độ đọc</label><select id="toc_do"></select></div>
+      <div><label class="f" for="phu_de">Phụ đề</label><select id="phu_de"></select></div>
+      <div><label class="f" for="dich">Cách dịch</label><select id="dich"></select></div>
+      <div><label class="f" for="am_thanh">Âm thanh nền</label><select id="am_thanh"></select></div>
+      <div><label class="f" for="thuyet_minh">Video không có lời nói</label><select id="thuyet_minh"></select></div>
+      <div><label class="f" for="sua">Sửa phụ đề trước khi lồng tiếng</label><select id="sua"></select></div>
+      <div><label class="f" for="lam_net">Làm nét video</label><select id="lam_net"></select></div>
+    </div>
+    <div class="row">
+      <button class="pri" onclick="themLink()">Thêm vào hàng chờ</button>
+      <label class="drop" id="drop">Hoặc kéo thả / bấm để chọn file video trong máy
+        <input type="file" id="file" accept="video/*" multiple hidden>
+      </label>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <details class="card" id="dsBox">
+    <summary><h2 style="display:inline">Dịch bằng DeepSeek</h2> <span class="sub" id="dsTt"></span></summary>
+    <div style="margin-top:12px">
+      <label class="f" for="dsKey">API key DeepSeek (lấy ở platform.deepseek.com → API keys)</label>
+      <div class="row">
+        <input id="dsKey" type="password" placeholder="sk-..." autocomplete="off" style="flex:1;min-width:200px">
+        <button onclick="luuKeyDs()">Lưu key</button>
+      </div>
+      <div class="sub" style="margin-top:8px">Lưu xong, chọn "DeepSeek" ở ô <b>Cách dịch</b> phía trên khi thêm video.</div>
+    </div>
+  </details>
+
+  <details class="card" id="ai33Box">
+    <summary><h2 style="display:inline">Giọng ai33.pro</h2> <span class="sub" id="ai33Tt"></span></summary>
+    <div style="margin-top:12px">
+      <label class="f" for="ai33Key">API key (lấy ở ai33.pro → Tài liệu API)</label>
+      <div class="row">
+        <input id="ai33Key" type="password" placeholder="Dán API key vào đây" autocomplete="off" style="flex:1;min-width:200px">
+        <button onclick="luuKey()">Lưu key</button>
+      </div>
+      <div class="opts" style="grid-template-columns: minmax(150px, 200px) auto 1fr; align-items:end">
+        <div><label class="f" for="ncc">Nguồn giọng</label>
+          <select id="ncc">
+            <option value="vbee">Vbee</option><option value="elevenlabs">ElevenLabs</option>
+            <option value="minimax">Minimax</option><option value="edge">Edge</option>
+            <option value="clone">Giọng đã nhái</option><option value="fishaudio">Fish Audio</option>
+            <option value="kokoro">Kokoro</option>
+          </select></div>
+        <div><span class="f">Giới tính</span>
+          <div class="row" id="gioiTinh" style="gap:4px">
+            <button class="sm pri" data-g="">Tất cả</button>
+            <button class="sm" data-g="male">Chỉ nam</button>
+            <button class="sm" data-g="female">Chỉ nữ</button>
+          </div></div>
+        <div><label class="f" for="tuKhoa">Lọc theo tên, miền, kiểu giọng... (gõ rồi Enter)</label>
+          <input id="tuKhoa" placeholder="vd: female, southern, review..."></div>
+      </div>
+      <div class="sub" style="margin-bottom:6px">Giọng đã thêm (hiện trong ô "Giọng lồng tiếng"):</div>
+      <div class="row" id="yeuThich" style="margin-bottom:10px"></div>
+      <div id="nhomVi"></div>
+      <div id="nhomTatCa" style="margin-top:14px"></div>
+    </div>
+  </details>
+
+  <section class="card">
+    <h2>Hàng chờ</h2>
+    <div id="list"><div class="empty">Chưa có video nào.</div></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <div class="dh"><strong>Sửa phụ đề tiếng Việt</strong><div class="sub" id="dlgName"></div>
+    <div class="sub">Sửa chữ cho đúng ý, gõ có dấu. Xoá trống một ô = bỏ câu đó.</div></div>
+  <div class="db" id="dlgBody"></div>
+  <div class="df">
+    <button onclick="dlg.close()">Để sau</button>
+    <button class="pri" onclick="luuSrt()">Lưu &amp; lồng tiếng</button>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const dlg = $('#dlg');
+let suaId = null, khoiSrt = [];
+
+const NHAN = {
+  cho_tai: ['Chờ tải', 'wait'], dang_tai: ['Đang tải', 'run'], cho_dich: ['Chờ dịch', 'wait'],
+  dang_dich: ['Đang dịch', 'run'], cho_sua: ['Chờ bạn sửa', 'edit'], cho_long_tieng: ['Chờ lồng tiếng', 'wait'],
+  xong: ['Xong', 'ok'], loi: ['Lỗi', 'err'], da_dung: ['Đã dừng', 'wait'],
+  cho_tai_tay: ['Cần tải tay', 'edit'], dang_tai_tay: ['Chờ bạn tải', 'edit'],
+};
+
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                               body: body ? JSON.stringify(body) : '{}' });
+  return r.json();
+}
+function lc() {
+  return { giong: $('#giong').value, toc_do: $('#toc_do').value, phu_de: $('#phu_de').value,
+           dich: $('#dich').value, am_thanh: $('#am_thanh').value, thuyet_minh: $('#thuyet_minh').value, lam_net: $('#lam_net').value,
+           sua: $('#sua').value };
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function thoiGian(giay) { giay = Math.max(0, Math.round(giay)); return `${Math.floor(giay / 60)}:${String(giay % 60).padStart(2, '0')}`; }
+
+async function napLuaChon() {
+  const o = await (await fetch('/api/options')).json();
+  for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net']) {
+    const dangChon = $('#' + k).value;
+    $('#' + k).innerHTML = o[k].map(v => `<option>${esc(v)}</option>`).join('');
+    const muon = dangChon || o.mac_dinh[k];
+    if (muon && o[k].includes(muon)) $('#' + k).value = muon;
+  }
+}
+
+for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net'])
+  $('#' + k).addEventListener('change', () => post('/api/lua_chon', { lc: lc() }));
+
+async function themLink() {
+  const text = $('#links').value.trim();
+  if (!text) { $('#msg').textContent = 'Chưa dán link nào.'; return; }
+  const r = await post('/api/add', { text, lc: lc() });
+  $('#msg').textContent = r.them ? `Đã thêm ${r.them} link vào hàng chờ.` : 'Không tìm thấy link nào trong nội dung đã dán.';
+  if (r.them) $('#links').value = '';
+  ve();
+}
+
+async function guiFile(files) {
+  for (const f of files) {
+    $('#msg').textContent = `Đang đưa "${f.name}" vào...`;
+    await fetch(`/api/upload?name=${encodeURIComponent(f.name)}&lc=${encodeURIComponent(JSON.stringify(lc()))}`,
+                { method: 'POST', body: f });
+  }
+  $('#msg').textContent = `Đã thêm ${files.length} file vào hàng chờ.`;
+  ve();
+}
+$('#file').onchange = e => guiFile([...e.target.files]);
+const drop = $('#drop');
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => guiFile([...e.dataTransfer.files]));
+
+async function ve() {
+  let d;
+  try { d = await (await fetch('/api/jobs')).json(); } catch { return; }
+  const jobs = [...d.jobs].reverse();
+  if (!jobs.length) { $('#list').innerHTML = '<div class="empty">Chưa có video nào.</div>'; return; }
+  $('#list').innerHTML = jobs.map(j => {
+    const [nhan, kieu] = NHAN[j.trang_thai] || [j.trang_thai, 'wait'];
+    const chay = kieu === 'run';
+    let sub = '';
+    if (j.trang_thai === 'loi') sub = `<div class="sub err">${esc(j.loi)}</div>`;
+    else if (j.trang_thai === 'cho_sua' && j.gia && j.gia.length) sub = `<div class="sub gia">⚠ Video có nói giá (${j.gia.length} câu). Kiểm tra số tiền rồi bấm "Lưu &amp; lồng tiếng".</div>`;
+    else if (j.trang_thai === 'cho_tai_tay') sub = `<div class="sub err">${esc(j.loi)}</div><div class="sub">Bấm "Tải qua Seekin", dán link (Cmd+V) và bấm Tải xuống trên trang. App tự nhận file trong Downloads.</div>`;
+    else if (j.trang_thai === 'xong') sub = `<div class="sub">${esc(j.ket_qua.split('/').pop())}</div>`
+      + (j.canh_bao ? `<div class="sub" style="color:var(--warn)">⚠ ${esc(j.canh_bao)}</div>` : '')
+      + (!j.canh_bao && j.da_va ? `<div class="sub" style="color:var(--ok)">✓ ${esc(j.da_va)}</div>` : '');
+    else if (j.buoc) sub = `<div class="sub">${esc(j.buoc)}${j.tien_do ? ' <b>' + esc(j.tien_do) + '</b>' : ''}${chay ? ' · ' + thoiGian(d.bay_gio - j.bat_dau) : ''}</div>`;
+    const ten = j.ten !== j.nguon ? j.ten : j.nguon;
+    const acts = [];
+    if (['cho_tai_tay', 'dang_tai_tay'].includes(j.trang_thai)) acts.push(`<button class="sm pri" onclick="post('/api/tai_tay?id=${j.id}').then(ve)">Tải qua Seekin</button>`, `<button class="sm" onclick="post('/api/retry?id=${j.id}', { lc: lc() }).then(ve)">Thử tự tải lại</button>`);
+    if (j.trang_thai === 'cho_sua') acts.push(j.gia && j.gia.length
+      ? `<button class="sm warnbtn" onclick="moSua('${j.id}')">⚠ Kiểm tra giá</button>`
+      : `<button class="sm pri" onclick="moSua('${j.id}')">Sửa phụ đề</button>`);
+    if (j.trang_thai === 'xong') acts.push(`<button class="sm pri" onclick="post('/api/open?id=${j.id}')">Xem video</button>`,
+                                          `<button class="sm" onclick="post('/api/reveal?id=${j.id}')">Hiện trong Finder</button>`);
+    if (j.trang_thai === 'xong' && j.canh_bao) acts.push(`<button class="sm pri" onclick="post('/api/redub?id=${j.id}').then(ve)">Lồng tiếng lại</button>`);
+    if (!['xong', 'loi', 'da_dung'].includes(j.trang_thai)) acts.push(`<button class="sm" onclick="post('/api/stop?id=${j.id}').then(ve)">■ Dừng</button>`);
+    if (['loi', 'xong', 'da_dung'].includes(j.trang_thai)) acts.push(`<button class="sm" onclick="post('/api/retry?id=${j.id}', { lc: lc() }).then(ve)">Làm lại</button>`);
+    if (!chay) acts.push(`<button class="sm" onclick="xoa('${j.id}')">Xoá</button>`);
+    return `<div class="job">
+      <div><div class="name">${esc(ten)}</div>${sub}
+        <div class="sub">${j.chu_de ? '📁 ' + esc(j.chu_de) + ' · ' : ''}${esc(j.lc.giong)} · ${esc(j.lc.phu_de)}</div></div>
+      <div><span class="chip ${kieu}">${chay ? '<span class="dot"></span>' : ''}${nhan}</span></div>
+      <div class="acts">${acts.join('')}</div></div>`;
+  }).join('');
+}
+
+async function xoa(id) {
+  const r = await post('/api/delete?id=' + id);
+  if (r.loi) $('#msg').textContent = r.loi;
+  ve();
+}
+
+async function moSua(id) {
+  const d = await (await fetch('/api/srt?id=' + id)).json();
+  if (d.loi) { $('#msg').textContent = d.loi; return; }
+  suaId = id; khoiSrt = d.khoi;
+  const gia = new Set(d.gia || []);
+  $('#dlgName').textContent = d.ten + (gia.size ? ` · ⚠ ${gia.size} câu có giá (tô vàng)` : '');
+  $('#dlgBody').innerHTML = khoiSrt.map((k, i) => `<div class="blk${gia.has(i) ? ' gia' : ''}"><div class="tg">${i + 1} · ${esc(k.tg)}${gia.has(i) ? ' · ⚠ có giá' : ''}</div>
+    <textarea rows="${Math.max(1, k.chu.split('\n').length)}" data-i="${i}">${esc(k.chu)}</textarea></div>`).join('');
+  dlg.showModal();
+}
+
+async function luuSrt() {
+  document.querySelectorAll('#dlgBody textarea').forEach(t => { khoiSrt[+t.dataset.i].chu = t.value; });
+  await post('/api/srt?id=' + suaId, { khoi: khoiSrt });
+  dlg.close();
+  ve();
+}
+
+// ----- DeepSeek -----
+function hienDs(d) {
+  $('#dsTt').textContent = !d.co_key ? '· chưa có API key' : d.loi ? '· ' + d.loi
+    : `· đã kết nối · mô hình ${d.model}${d.so_du ? ' · số dư ' + d.so_du : ''}`;
+}
+async function trangThaiDs() { hienDs(await (await fetch('/api/deepseek/status')).json()); }
+async function luuKeyDs() {
+  const key = $('#dsKey').value.trim();
+  if (!key) return;
+  $('#dsTt').textContent = '· đang kiểm tra...';
+  const d = await post('/api/deepseek/key', { key });
+  if (!d.loi) $('#dsKey').value = '';
+  hienDs(d);
+}
+trangThaiDs();
+
+// ----- ai33 -----
+let amThanh = null;
+async function trangThaiAi33() {
+  const d = await (await fetch('/api/ai33/status')).json();
+  $('#ai33Tt').textContent = !d.co_key ? '· chưa có API key' : d.loi ? '· ' + d.loi : `· còn ${d.credits} credit`;
+  $('#yeuThich').innerHTML = d.yeu_thich.length ? d.yeu_thich.map(g =>
+    `<span class="tag">${esc(g.ten)}<button title="Bỏ" onclick="boGiong('${esc(g.voice_id)}')">✕</button></span>`).join('')
+    : '<span class="sub">Chưa có. Tìm giọng bên dưới rồi bấm "Thêm".</span>';
+}
+async function luuKey() {
+  const key = $('#ai33Key').value.trim();
+  if (!key) return;
+  const r = await post('/api/ai33/key', { key });
+  $('#ai33Key').value = '';
+  $('#ai33Tt').textContent = r.ok ? `· đã lưu key, còn ${r.credits} credit` : '· ' + r.loi;
+}
+// Mỗi nhóm: { vi: chỉ tiếng Việt?, trang, ds, het }
+const dsGiong = [];
+const nhom = { nhomVi: { vi: 1, ten: 'Giọng tiếng Việt' }, nhomTatCa: { vi: 0, ten: 'Tất cả giọng' } };
+let lanTai = 0;
+
+function dongGiong(g) {
+  const i = dsGiong.push(g) - 1;
+  const mo_ta = [g.gender, g.language, ...(g.tags || []).filter(t => t !== g.language && t !== g.gender).slice(0, 4)];
+  return `<div class="gv"><div class="nm"><div class="name">${esc(g.name)}</div>
+      <div class="sub">${esc(mo_ta.filter(Boolean).join(' · '))}</div></div>
+    <div class="row">${g.preview_url ? `<button class="sm" onclick="ngheThu(${i})">▶ Nghe</button>` : ''}
+    <button class="sm pri" onclick="themGiong(${i})">+ Thêm</button></div></div>`;
+}
+
+const MOI_TRANG = 24;
+async function taiNhom(id, trang = 1) {
+  const n = nhom[id], lan = lanTai, box = $('#' + id);
+  if (!box.querySelector('.luoi')) box.innerHTML = `<h2>${n.ten}</h2><div class="luoi"></div><div class="phan-trang"></div>`;
+  box.querySelector('.phan-trang').innerHTML = '<span class="sub">Đang tải...</span>';
+  const u = `/api/ai33/voices?provider=${$('#ncc').value}&q=${encodeURIComponent($('#tuKhoa').value.trim())}`
+          + `&page=${trang}&vi=${n.vi}&gender=${gioiTinh}&size=${MOI_TRANG}`;
+  const d = await (await fetch(u)).json();
+  if (lan !== lanTai) return;  // đã đổi bộ lọc trong lúc chờ
+  if (d.loi) { box.querySelector('.phan-trang').innerHTML = `<span class="sub err">${esc(d.loi)}</span>`; return; }
+  const pg = d.pagination || {};
+  const tong = pg.total ?? d.data.length;
+  if (!tong && id === 'nhomVi') { box.innerHTML = ''; return; }  // nguồn này không có giọng Việt -> ẩn nhóm
+  const soTrang = Math.max(1, Math.ceil(tong / MOI_TRANG));
+  box.querySelector('h2').textContent = `${n.ten} (${tong})`;
+  box.querySelector('.luoi').innerHTML = d.data.length ? d.data.map(dongGiong).join('')
+                                                      : '<div class="sub">Không có giọng nào.</div>';
+  box.querySelector('.phan-trang').innerHTML = soTrang <= 1 ? '' :
+    `<button class="sm" ${trang <= 1 ? 'disabled' : ''} onclick="taiNhom('${id}', ${trang - 1})">← Trước</button>
+     <span class="sub">Trang ${trang} / ${soTrang}</span>
+     <button class="sm" ${!pg.has_more ? 'disabled' : ''} onclick="taiNhom('${id}', ${trang + 1})">Sau →</button>`;
+}
+
+function taiGiong() {
+  lanTai++;
+  dsGiong.length = 0;
+  $('#nhomVi').innerHTML = '';
+  $('#nhomTatCa').innerHTML = '';
+  taiNhom('nhomVi');
+  taiNhom('nhomTatCa');
+}
+
+function ngheThu(i) {
+  if (amThanh) amThanh.pause();
+  amThanh = new Audio(dsGiong[i].preview_url);
+  amThanh.play();
+}
+async function themGiong(i) {
+  const g = dsGiong[i];
+  await post('/api/ai33/fav', { voice_id: g.voice_id, ten: g.name });
+  await napLuaChon();
+  $('#giong').value = 'ai33 · ' + g.name;
+  trangThaiAi33();
+}
+async function boGiong(id) {
+  await post('/api/ai33/fav', { voice_id: id, bo: true });
+  await napLuaChon();
+  trangThaiAi33();
+}
+$('#tuKhoa').addEventListener('keydown', e => { if (e.key === 'Enter') taiGiong(); });
+$('#ncc').addEventListener('change', taiGiong);
+let gioiTinh = '';
+document.querySelectorAll('#gioiTinh button').forEach(b => b.addEventListener('click', () => {
+  gioiTinh = b.dataset.g;
+  document.querySelectorAll('#gioiTinh button').forEach(x => x.classList.toggle('pri', x === b));
+  taiGiong();
+}));
+$('#ai33Box').addEventListener('toggle', e => {
+  if (e.target.open) { trangThaiAi33(); if (!$('#nhomTatCa').innerHTML) taiGiong(); }
+});
+trangThaiAi33();
+
+napLuaChon();
+ve();
+setInterval(ve, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Chỉ đưa code của tool lên. Mọi thứ khác (video, mô hình, key, hàng chờ, cài đặt cá nhân) bị bỏ qua.
+/*
+!/.gitignore
+!/README.md
+!/HUONG_DAN.md
+!/auto_dich.py
+!/hang_doi.py
+!/che_chu.py
+!/xoa_chu_ai.py
+!/thuyet_minh.py
+!/hieu_ung.py
+!/gia_tien.py
+!/rut_gon.py
+!/lam_net.py
+!/ai33.py
+!/deepseek_cfg.py
+!/tai_douyin.py
+!/cai_dat_cfg.py
+!/giao_dien.html
+!/Mo pyVideoTrans.command
+!/phat_hanh/
+/phat_hanh/*.zip
+.DS_Store
+__pycache__/
