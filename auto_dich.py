@@ -9,6 +9,7 @@ Mỗi lần chạy sẽ hỏi: chọn giọng, tốc độ đọc, có sửa ph�
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -199,13 +200,15 @@ def nhan_dien_ngon_ngu(video: Path, chay=subprocess.run) -> str:
 
 def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
              toc_do: str, phu_de: str, xoa_cache: bool, dich: str = "0", chay=subprocess.run,
-             tach_giong: bool = False, viet_loi=None, chi_dich: bool = False) -> subprocess.CompletedProcess:
+             tach_giong: bool = False, viet_loi=None, chi_dich: bool = False,
+             kieu: str = None) -> subprocess.CompletedProcess:
     """viet_loi(tam, lang): hàm viết lời thuyết minh khi video không có lời nói (None = không viết).
     Trả về None nếu viết xong (đã có tam/vi.srt), hoặc CompletedProcess báo lỗi.
     chi_dich=True: chỉ nghe + dịch ra tam/vi.srt rồi dừng (chưa lồng tiếng) để kiểm tra trước."""
     if tts_type == "35":
         dat_cau_noi_ai33()
     dat_luat_gia_tien()
+    dat_ha_nhac_nen()
     env = dict(os.environ)
     # ffmpeg-full có hỗ trợ chèn phụ đề
     env["PATH"] = PATH_THEM + env.get("PATH", "")
@@ -228,7 +231,7 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
             # dịch riêng trước để sửa giá tiền / con số rồi mới lồng tiếng
             dich_rieng(goc, lang, dich, tam, env, chay)
         if vi.exists():
-            hoan_thien_phu_de(vi, goc)
+            hoan_thien_phu_de(vi, goc, kieu)
         if chi_dich:
             return subprocess.CompletedProcess([], 0, "", "")
     vi, goc = tam / f"{NGON_NGU_DICH}.srt", tam / f"{lang}.srt"
@@ -252,12 +255,14 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
     if hien:
         gia_tien.tra_hien(vi, hien)      # phụ đề hiện trên video giữ dạng số (9,9 tệ)
     elif vi.exists():
-        hoan_thien_phu_de(vi, goc)       # bước chỉ dịch (chờ sửa): sửa sẵn giá tiền, rút gọn câu dài
+        hoan_thien_phu_de(vi, goc, kieu)       # bước chỉ dịch (chờ sửa): sửa sẵn giá tiền, rút gọn câu dài
     return kq
 
 
-def hoan_thien_phu_de(vi: Path, goc: Path):
-    """Sau khi dịch: đổi giá tiền + rút gọn câu quá dài (để giọng đọc không bị nhanh)."""
+def hoan_thien_phu_de(vi: Path, goc: Path, kieu: str = None):
+    """Sau khi dịch: viết lại tự nhiên + câu mở đầu thu hút, đổi giá tiền, rút gọn câu quá dài."""
+    import viet_lai
+    viet_lai.viet_lai(vi, goc, kieu)
     gia_tien.sua_hien(vi, goc)
     import rut_gon
     rut_gon.rut_gon(vi)
@@ -287,6 +292,31 @@ PRICES & MONEY (critical: the voice reads exactly what you write). Prices in the
 - Vietnamese number format: comma for decimals (69,9), dot for thousands (20.000). 万 = 10.000 (2万 -> 20.000, never "vạn").
 - Never convert to VND. Never use "chục", "xị", "k", "hào", "rưỡi", "đồng" for prices."""
 _DAU_GIA = "PRICES & MONEY (critical"
+
+
+# Tự hạ nhạc nền khi có giọng đọc (ducking). Nhạc nhỏ đi khoảng HA_NHAC_DB khi có giọng, hết giọng to lại.
+HA_NHAC = True
+HA_NHAC_TY_LE = 4          # càng lớn nhạc càng bị hạ mạnh (4 ~ nhỏ đi 8 dB; 6 ~ 11 dB)
+_TRON_CU = "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.95:level=0"
+
+
+def dat_ha_nhac_nen():
+    """Sửa bước trộn giọng + nhạc nền của pyVideoTrans: nhạc tự nhỏ lại khi có giọng đọc."""
+    f = PVT / "videotrans" / "task" / "_stage_audio.py"
+    try:
+        s = f.read_text(encoding="utf-8")
+        moi = ("[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[vo][sc];"
+               f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo[bgi];"
+               f"[bgi][sc]sidechaincompress=threshold=0.02:ratio={HA_NHAC_TY_LE}:attack=30:release=500[bg];"
+               "[vo][bg]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.95:level=0")
+        hien = re.search(r'"(\[0:a\][^"]*amix=inputs=2:duration=first[^"]*)"', s)
+        if not hien:
+            return
+        muon = moi if HA_NHAC else _TRON_CU
+        if hien.group(1) != muon:
+            f.write_text(s.replace(hien.group(1), muon), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def dat_luat_gia_tien():

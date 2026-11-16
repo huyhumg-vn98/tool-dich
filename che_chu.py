@@ -10,6 +10,7 @@ Cách làm (theo dõi từng dòng chữ gốc):
 5. Mỗi câu tiếng Việt đặt vào đúng chỗ dòng chữ gốc đang hiện cùng lúc.
 """
 import difflib
+import json
 import os
 import re
 import subprocess
@@ -49,6 +50,7 @@ KIEU_CHE = "ai"            # "ai":  AI xoá sạch chữ gốc (vẽ lại nền
 FONT = "Avenir Next Bold" if sys.platform == "darwin" else "Arial"   # font đủ dấu tiếng Việt
 MAU_CHU = "&H00FFFFFF"     # màu chữ Việt, dạng &H00BBGGRR: trắng &H00FFFFFF, vàng &H0000FFFF
 MAU_VIEN = "&H00000000"    # màu viền chữ (đen)
+MAU_TU_KHOA = "&H0000D7FF"  # màu tô từ khoá + giá tiền (vàng); "" = tắt tô màu
 CO_CHU = 0.05              # cỡ chữ = 5% bề ngang video (tự co giãn theo chữ gốc)
 MAU_KHUNG = "black"        # (kiểu "den") màu khung che
 CRF = 16                   # chất lượng video ra: 16 = gần như không mất chất lượng; 18-20 = file nhẹ hơn
@@ -271,6 +273,32 @@ def tinh_chinh(video, dong, buoc, tong):
 
 
 # ---------- 4-5. Che chữ + đặt phụ đề Việt ----------
+GIA_TIEN = re.compile(r"(?:\d[\d.,]*|vài|mấy|gần|hơn)\s*(?:trăm\s*|nghìn\s*|triệu\s*)?(?:cành|tệ|đồng|%)"
+                      r"|\d[\d.,]*\s*(?:cm|mm|m|kg|g|ml|lít|km)\b")
+
+
+def to_mau(chu: str, tu_khoa=()):
+    """Tô màu giá tiền / số đo + từ khoá trong 1 câu phụ đề (thẻ màu ASS, không đổi chữ)."""
+    if not MAU_TU_KHOA:
+        return chu
+    mau = "&H" + MAU_TU_KHOA[-6:] + "&"
+    goc = "&H" + MAU_CHU[-6:] + "&"
+    mau_chon = [m.span() for m in GIA_TIEN.finditer(chu)]
+    for t in sorted(tu_khoa, key=len, reverse=True):
+        for m in re.finditer(re.escape(t), chu, re.I):
+            a, b = m.span()
+            if not any(a < y and x < b for x, y in mau_chon):     # không chồng lên đoạn đã tô
+                mau_chon.append((a, b))
+    if not mau_chon:
+        return chu
+    ra, cu = [], 0
+    for a, b in sorted(mau_chon):
+        ra += [chu[cu:a], f"{{\\1c{mau}}}", chu[a:b], f"{{\\1c{goc}}}"]
+        cu = b
+    ra.append(chu[cu:])
+    return "".join(ra)
+
+
 def doc_srt(srt: Path):
     def giay(s):
         h, m, r = s.strip().split(":")
@@ -361,6 +389,11 @@ def lam(video: str, srt: str, ra: str, kieu: str = None, hieu_ung: str = None):
     for d in dong:
         d["t0"], d["t1"] = d["bd_chinh"] / fps, (d["kt_chinh"] + 1) / fps
     cau = doc_srt(Path(srt))
+    tu_khoa = []
+    try:   # từ khoá do viet_lai.py chọn (cùng thư mục với phụ đề)
+        tu_khoa = json.loads((Path(srt).parent / "viet_lai.json").read_text(encoding="utf-8")).get("tu_khoa", [])
+    except Exception:
+        pass
     su_kien, che, vi_tri_chung = vi_tri(W, H, dong, cau)
     kc = kieu or KIEU_CHE
     if kc == "ai":
@@ -445,7 +478,7 @@ def lam(video: str, srt: str, ra: str, kieu: str = None, hieu_ung: str = None):
                 khung_viet.append(f"drawbox=x={kx1}:y={ky1}:w={kx2 - kx1}:h={ky2 - ky1}:color={MAU_KHUNG}@1:t=fill"
                                   f":enable='between(t,{a:.3f},{b:.3f})'")
             dong_ass.append(f"Dialogue: 0,{tg_ass(a)},{tg_ass(b)},Default,,0,0,0,,"
-                            f"{{\\an5\\pos({int(x)},{int(y)})\\fs{co}\\bord{vien}}}{chu}")
+                            f"{{\\an5\\pos({int(x)},{int(y)})\\fs{co}\\bord{vien}}}{to_mau(chu, tu_khoa)}")
         (Path(tmp) / "sub.ass").write_text(dau + "\n".join(dong_ass) + "\n", encoding="utf-8")
         loc.extend(khung_viet)
         if WIN:

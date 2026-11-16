@@ -268,7 +268,7 @@ async function ve() {
     if (!chay) acts.push(`<button class="sm" onclick="xoa('${j.id}')">Xoá</button>`);
     return `<div class="job">
       <div><div class="name">${esc(ten)}</div>${sub}
-        <div class="sub">${j.chu_de ? '📁 ' + esc(j.chu_de) + ' · ' : ''}${esc(j.lc.giong)} · ${esc(j.lc.phu_de)}</div></div>
+        <div class="sub">${j.chu_de ? '📁 ' + esc(j.chu_de) + ' · ' : ''}${j.kieu_nd ? '🏷 ' + esc(j.kieu_nd) + ' · ' : ''}${esc(j.lc.giong)} · ${esc(j.lc.phu_de)}</div></div>
       <div><span class="chip ${kieu}">${chay ? '<span class="dot"></span>' : ''}${nhan}</span></div>
       <div class="acts">${acts.join('')}</div></div>`;
   }).join('');

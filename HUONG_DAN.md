@@ -29,10 +29,17 @@ Nút trên mỗi video: **■ Dừng** (bấm nhầm), **Làm lại** (chạy l�
      "199元" → "765 cành", "500 nghìn đồng" → "500 cành". Tỷ giá lấy mới mỗi ngày (mất mạng thì dùng tỷ giá đã lưu).
      Làm tròn cho gọn: dưới 100 cành tròn 1 cành, 100-999 tròn 10 cành, từ 1.000 tròn 100 cành. Giọng đọc nhận số dạng chữ nên không đọc lệch.
      Tắt quy đổi / đổi tên "cành": đầu file `gia_tien.py` (QUY_DOI_VND, TEN_NGHIN).
+   - **Viết lại lời tự nhiên kiểu người Việt** (cần key DeepSeek): AI tự nhận ra kiểu video (bán hàng / hướng dẫn /
+     giải trí / kiến thức) và viết lại từng câu theo giọng văn đó, đúng thuật ngữ (vd lái xe: "đánh lái", "trả lái"),
+     giữ nguyên con số và giá. Câu trong **3 giây đầu** được viết thành câu mở đầu thu hút để giữ chân người xem.
+     Ghi cố định kiểu cho cả thư mục chủ đề: tạo file `kieu.txt` ghi `ban hang` / `huong dan` / `giai tri` / `kien thuc`.
+     Tắt: `viet_lai.py` → BAT = False.
+   - **Phụ đề tô màu**: giá tiền, số đo và từ khoá quan trọng (AI chọn) hiện màu vàng. Đổi màu / tắt: `che_chu.py` → MAU_TU_KHOA.
    - **Chống đọc nhanh**: câu dịch nào quá nhiều chữ so với thời gian (trên 5 tiếng/giây) thì DeepSeek tự viết
      ngắn lại; còn chật thì mượn thêm tối đa 0,6 giây từ câu bên cạnh đang dư. Chỉnh ở đầu `rut_gon.py`
      (TOC_DO_TOI_DA, LECH_TOI_DA). Cần API key DeepSeek; không có key thì bỏ qua bước viết ngắn.
-6. Tách giọng gốc khỏi nhạc nền (giữ nhạc + hiệu ứng), lồng tiếng Việt 6 câu song song; lỗi tạm thời tự thử lại.
+6. Tách giọng gốc khỏi nhạc nền (giữ nhạc + hiệu ứng). **Nhạc nền tự nhỏ lại khi có giọng đọc** (~8 dB), hết giọng to lại
+   (chỉnh `auto_dich.py` → HA_NHAC, HA_NHAC_TY_LE), lồng tiếng Việt 6 câu song song; lỗi tạm thời tự thử lại.
 7. Che chữ gốc: tìm "làn phụ đề" (chữ căn giữa, lặp lại cùng chỗ), bỏ qua chữ trong cảnh
    (biển số, chữ trên xe, bao bì). Có 2 kiểu (chọn ở ô "Phụ đề"):
    - **AI xoá sạch** (mặc định): AI (mô hình LaMa) vẽ lại nền chỗ chữ gốc, chữ Trung biến mất hẳn,

@@ -289,9 +289,33 @@ CHU_DE = GOC / "Chu_De"
 HUONG_DAN_CHU_DE = """Mỗi chủ đề là 1 thư mục con ở đây, vd:  Chu_De/My_pham/links.txt
 Dán link Douyin/TikTok vào file .txt trong thư mục chủ đề (mỗi dòng 1 link, dán cả đoạn chia sẻ cũng được) rồi lưu.
 Dòng bắt đầu bằng # là ghi chú, tool bỏ qua. Xem mẫu: Chu_De/Vi_du_My_pham/links.txt
+Kiểu nội dung (không bắt buộc): tạo file kieu.txt trong thư mục chủ đề, ghi 1 trong:
+  ban hang / huong dan / giai tri / kien thuc
+-> AI viết lời, câu mở đầu, từ khoá theo kiểu đó. Không có file thì AI tự nhận ra từng video.
 Tool tự thấy link mới sau ~15 giây, xử lý lần lượt, video xong nằm ở Video_Ra/<tên chủ đề>/.
 Link đã thêm được ghi vào .da_them.txt trong thư mục chủ đề (xoá dòng trong đó nếu muốn làm lại link đó).
 """
+
+
+def kieu_chu_de(j):
+    """Kiểu nội dung ghi sẵn cho thư mục chủ đề (Chu_De/<chủ đề>/kieu.txt). Không có -> AI tự nhận ra."""
+    if not j.get("chu_de"):
+        return None
+    try:
+        import viet_lai
+        return viet_lai.doc_kieu((CHU_DE / j["chu_de"] / "kieu.txt").read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def ghi_kieu(j, tam):
+    """Hiện kiểu video AI đã nhận ra (bán hàng / hướng dẫn...) trên hàng chờ."""
+    try:
+        d = json.loads((tam / "viet_lai.json").read_text(encoding="utf-8"))
+        if d.get("ten_kieu"):
+            cap_nhat(j, kieu_nd=d["ten_kieu"])
+    except Exception:
+        pass
 
 
 def quet_chu_de() -> int:
@@ -399,14 +423,16 @@ def xu_ly(j):
         if sua:
             cap_nhat(j, buoc="Nhận dạng giọng nói & dịch phụ đề...")
             kq = a.chay_pvt(video, lang, tam, tts_type, "No", toc_do, "0", xoa_cache=True, dich=dich, chay=chay,
-                            tach_giong=tach, viet_loi=viet_loi)
+                            tach_giong=tach, viet_loi=viet_loi, kieu=kieu_chu_de(j))
+            ghi_kieu(j, tam)
             if kq.returncode != 0 or not srt.exists():
                 return cap_nhat(j, trang_thai="loi", loi=mo_ta_loi(kq), buoc="")
             return cap_nhat(j, trang_thai="cho_sua", buoc="Chờ bạn sửa phụ đề", gia=a.gia_tien.cau_co_gia(srt, goc_srt))
         # dịch trước, chưa lồng tiếng: có câu nói giá -> dừng lại cho bạn kiểm tra
         cap_nhat(j, buoc="Nhận dạng giọng nói & dịch phụ đề...")
         kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=True, dich=dich, chay=chay,
-                        tach_giong=tach, viet_loi=viet_loi, chi_dich=True)
+                        tach_giong=tach, viet_loi=viet_loi, chi_dich=True, kieu=kieu_chu_de(j))
+        ghi_kieu(j, tam)
         if kq.returncode != 0:
             return cap_nhat(j, trang_thai="loi", loi=mo_ta_loi(kq), buoc="")
         gia = a.gia_tien.cau_co_gia(srt, goc_srt) if srt.exists() else []
