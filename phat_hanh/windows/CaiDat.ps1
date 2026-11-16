@@ -28,17 +28,22 @@ try {
 
     # ---------- Git (vài thư viện của pyVideoTrans phải tải bằng Git) ----------
     # Máy chưa có Git -> tải bản Git gọn (MinGit) vào thư mục tool, không cần quyền quản trị.
-    if (Test-Path "$GOC\git\cmd\git.exe") { $env:Path = "$GOC\git\cmd;$env:Path" }
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Host "Máy chưa có Git - đang tải bản Git gọn..."
-        $zip = "$env:TEMP\dichvideo_git.zip"
-        Invoke-WebRequest $GIT_ZIP -OutFile $zip
-        if (Test-Path "$GOC\git") { Remove-Item "$GOC\git" -Recurse -Force }
-        Expand-Archive $zip "$GOC\git" -Force
-        Remove-Item $zip -Force -ErrorAction SilentlyContinue
-        $env:Path = "$GOC\git\cmd;$env:Path"
+    # (Không bắt buộc: tải lỗi thì vẫn cài tiếp được.)
+    try {
+        if (Test-Path "$GOC\git\cmd\git.exe") { $env:Path = "$GOC\git\cmd;$env:Path" }
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            Write-Host "Máy chưa có Git - đang tải bản Git gọn..."
+            $zip = "$env:TEMP\dichvideo_git.zip"
+            Invoke-WebRequest $GIT_ZIP -OutFile $zip
+            if (Test-Path "$GOC\git") { Remove-Item "$GOC\git" -Recurse -Force }
+            Expand-Archive $zip "$GOC\git" -Force
+            Remove-Item $zip -Force -ErrorAction SilentlyContinue
+            $env:Path = "$GOC\git\cmd;$env:Path"
+        }
+        git --version
+    } catch {
+        Write-Host "Không tải được Git - bỏ qua (không bắt buộc)." -ForegroundColor Yellow
     }
-    git --version
 
     # ---------- 2. ffmpeg ----------
     Buoc "2/6 Tải ffmpeg (xử lý video)"
@@ -92,9 +97,12 @@ try {
 
     # ---------- 5. Phần đọc chữ (OCR) + tải video ----------
     Buoc "5/6 Cài phần đọc chữ trên hình (OCR) và tải video"
-    if (-not (Test-Path "$GOC\.venv_tool\Scripts\python.exe")) {
+    foreach ($lan in 1..3) {
+        if (Test-Path "$GOC\.venv_tool\Scripts\python.exe") { break }
         uv venv --python 3.10 "$GOC\.venv_tool"
+        if ($LASTEXITCODE -ne 0) { Write-Host "Tải Python lỗi - thử lại sau 10 giây..." -ForegroundColor Yellow; Start-Sleep -Seconds 10 }
     }
+    if (-not (Test-Path "$GOC\.venv_tool\Scripts\python.exe")) { throw "Không tải được Python 3.10 (mạng không ổn định - thử lại sau hoặc đổi mạng/4G)" }
     $env:VIRTUAL_ENV = "$GOC\.venv_tool"
     $ok = $false
     foreach ($lan in 1..3) {
@@ -108,22 +116,22 @@ try {
     # Mô hình AI xoá chữ gốc (LaMa, ~200 MB). Tải lỗi thì tool tự dùng kiểu khung đen.
     New-Item -ItemType Directory -Force "$GOC\mo_hinh" | Out-Null
     if (-not (Test-Path "$GOC\mo_hinh\big-lama.pt")) {
-        try {
-            Invoke-WebRequest "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt" -OutFile "$GOC\mo_hinh\big-lama.pt.tam"
-            Move-Item "$GOC\mo_hinh\big-lama.pt.tam" "$GOC\mo_hinh\big-lama.pt"
-        } catch {
-            Remove-Item "$GOC\mo_hinh\big-lama.pt.tam" -ErrorAction SilentlyContinue
-            Write-Host "Chưa tải được mô hình AI xoá chữ - tạm dùng kiểu khung đen." -ForegroundColor Yellow
+        # curl có tự thử lại + tải tiếp từ chỗ bị đứt (mạng yếu không phải tải lại từ đầu)
+        & curl.exe -fL --retry 10 --retry-delay 5 --retry-all-errors -C - -o "$GOC\mo_hinh\big-lama.pt.tam" "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt"
+        if ($LASTEXITCODE -eq 0) {
+            Move-Item -Force "$GOC\mo_hinh\big-lama.pt.tam" "$GOC\mo_hinh\big-lama.pt"
+        } else {
+            Write-Host "Chưa tải được mô hình AI xoá chữ - tạm dùng kiểu khung đen. Chạy lại CaiDat.bat để tải tiếp." -ForegroundColor Yellow
         }
     }
     # Mô hình AI làm nét video mờ (Real-ESRGAN, ~5 MB). Tải lỗi thì bỏ qua bước làm nét.
     if (-not (Test-Path "$GOC\mo_hinh\realesr-general-x4v3.pth")) {
-        try {
-            Invoke-WebRequest "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth" -OutFile "$GOC\mo_hinh\realesr-general-x4v3.pth.tam"
-            Move-Item "$GOC\mo_hinh\realesr-general-x4v3.pth.tam" "$GOC\mo_hinh\realesr-general-x4v3.pth"
-        } catch {
-            Remove-Item "$GOC\mo_hinh\realesr-general-x4v3.pth.tam" -ErrorAction SilentlyContinue
-            Write-Host "Chưa tải được mô hình làm nét - bỏ qua bước làm nét." -ForegroundColor Yellow
+        # curl có tự thử lại + tải tiếp từ chỗ bị đứt (mạng yếu không phải tải lại từ đầu)
+        & curl.exe -fL --retry 10 --retry-delay 5 --retry-all-errors -C - -o "$GOC\mo_hinh\realesr-general-x4v3.pth.tam" "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
+        if ($LASTEXITCODE -eq 0) {
+            Move-Item -Force "$GOC\mo_hinh\realesr-general-x4v3.pth.tam" "$GOC\mo_hinh\realesr-general-x4v3.pth"
+        } else {
+            Write-Host "Chưa tải được mô hình làm nét - bỏ qua bước làm nét. Chạy lại CaiDat.bat để tải tiếp." -ForegroundColor Yellow
         }
     }
 

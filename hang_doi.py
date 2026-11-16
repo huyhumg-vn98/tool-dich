@@ -524,7 +524,7 @@ def va_cau_cam(j, tu_dong=False):
     cap_nhat(j, buoc=f"Đọc lại {len(cam)} câu câm...")
     env = dict(__import__("os").environ)
     env["PATH"] = a.PATH_THEM + env.get("PATH", "")
-    r = chay(["uv", "run", "cli.py", "--task", "tts", "--name", str(mini), "--tts_type", tts_type,
+    r = chay([str(a.PY_PVT), "cli.py", "--task", "tts", "--name", str(mini), "--tts_type", tts_type,
               "--voice_role", giong, "--voice_rate", toc_do, "--voice_autorate", "--align_sub_audio",
               "--target_language_code", a.NGON_NGU_DICH, "--output-dir", str(tam / "ra")],
              cwd=a.PVT, env=env, capture_output=True, text=True)

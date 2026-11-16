@@ -234,7 +234,7 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
     vi, goc = tam / f"{NGON_NGU_DICH}.srt", tam / f"{lang}.srt"
     hien = gia_tien.tach_doc(vi, goc) if giong != "No" and vi.exists() else None
     lenh = [
-        "uv", "run", "cli.py", "--task", "vtv",
+        str(PY_PVT), "cli.py", "--task", "vtv",
         "--name", str(video),
         "--source_language_code", lang,
         "--target_language_code", NGON_NGU_DICH,
@@ -269,7 +269,7 @@ def dich_rieng(goc: Path, lang: str, dich: str, tam: Path, env: dict, chay=subpr
     ra = tam / "_dich"
     shutil.rmtree(ra, ignore_errors=True)
     try:
-        chay(["uv", "run", "cli.py", "--task", "sts", "--name", str(goc), "--source_language_code", lang,
+        chay([str(PY_PVT), "cli.py", "--task", "sts", "--name", str(goc), "--source_language_code", lang,
               "--target_language_code", NGON_NGU_DICH, "--translate_type", dich, "--output-dir", str(ra)],
              cwd=PVT, env=env, capture_output=True, text=True)
         f = next(ra.glob(f"*.{NGON_NGU_DICH}.srt"), None) if ra.exists() else None
@@ -305,7 +305,7 @@ def nghe(video: Path, lang: str, tam: Path, env: dict, chay=subprocess.run) -> s
     tam.mkdir(parents=True, exist_ok=True)
     tam_nghe = tam / "_nghe"
     shutil.rmtree(tam_nghe, ignore_errors=True)
-    kq = chay(["uv", "run", "cli.py", "--task", "stt", "--name", str(video),
+    kq = chay([str(PY_PVT), "cli.py", "--task", "stt", "--name", str(video),
                "--source_language_code", lang, "--recogn_type", "0", "--model_name", MO_HINH,
                "--output-dir", str(tam_nghe)], cwd=PVT, env=env, capture_output=True, text=True)
     srt = next(tam_nghe.glob("*.srt"), None) if tam_nghe.exists() else None
