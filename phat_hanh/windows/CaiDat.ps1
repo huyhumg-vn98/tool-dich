@@ -9,6 +9,7 @@ $GOC = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $GOC
 $PVT_COMMIT = "370a65ca391022e32355413bd6be22156ade943c"   # bản pyVideoTrans đã kiểm tra
 $FFMPEG_ZIP = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+$GIT_ZIP = "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/MinGit-2.47.1-64-bit.zip"
 
 function Buoc($t) { Write-Host "`n==> $t" -ForegroundColor Green }
 
@@ -24,6 +25,20 @@ try {
         $env:Path = "$uvDir;$env:Path"
     }
     uv --version
+
+    # ---------- Git (vài thư viện của pyVideoTrans phải tải bằng Git) ----------
+    # Máy chưa có Git -> tải bản Git gọn (MinGit) vào thư mục tool, không cần quyền quản trị.
+    if (Test-Path "$GOC\git\cmd\git.exe") { $env:Path = "$GOC\git\cmd;$env:Path" }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "Máy chưa có Git - đang tải bản Git gọn..."
+        $zip = "$env:TEMP\dichvideo_git.zip"
+        Invoke-WebRequest $GIT_ZIP -OutFile $zip
+        if (Test-Path "$GOC\git") { Remove-Item "$GOC\git" -Recurse -Force }
+        Expand-Archive $zip "$GOC\git" -Force
+        Remove-Item $zip -Force -ErrorAction SilentlyContinue
+        $env:Path = "$GOC\git\cmd;$env:Path"
+    }
+    git --version
 
     # ---------- 2. ffmpeg ----------
     Buoc "2/6 Tải ffmpeg (xử lý video)"
