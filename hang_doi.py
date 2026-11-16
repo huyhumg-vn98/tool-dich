@@ -487,10 +487,11 @@ def xu_ly(j):
     hieu_ung = tam / "hieu_ung.json"     # do thuyet_minh.py ghi ra (chỉ có ở video không lời)
     if a.la_kieu_che(lc.get("phu_de")):
         kc = a.kieu_che(lc.get("phu_de"))
-        cap_nhat(j, buoc=("AI xoá chữ gốc & gắn phụ đề Việt..." if kc == "ai" else "Che chữ gốc & gắn phụ đề Việt..."))
+        cap_nhat(j, buoc={"ai": "AI xoá chữ gốc & gắn phụ đề Việt...", "ai_trong": "AI xoá chữ gốc (không gắn phụ đề)..."}
+                 .get(kc, "Che chữ gốc & gắn phụ đề Việt..."))
         da_che = tam / f"che_{j['id']}.mp4"
         # video không lời có thuyết minh AI -> thêm zoom ở điểm nhấn (chỉ kiểu AI xoá chữ)
-        hu = [str(hieu_ung)] if kc == "ai" and hieu_ung.exists() else []
+        hu = [str(hieu_ung)] if kc in ("ai", "ai_trong") and hieu_ung.exists() else []
         r = chay([str(a.PY_TOOL), "-X", "utf8", "-I", str(GOC / "che_chu.py"),
                             str(video_ra), str(srt), str(da_che), kc, *hu], capture_output=True, text=True)
         if r.returncode != 0 or not da_che.exists():
@@ -712,7 +713,7 @@ class XuLy(BaseHTTPRequestHandler):
                 return self.gui({"jobs": ds, "bay_gio": time.time()})
         if u.path == "/api/options":
             return self.gui({"giong": list(a.danh_sach_giong()), "toc_do": list(a.TOC_DO),
-                             "phu_de": [a.PD_XOA, a.PD_CHE, a.PD_THUONG, a.PD_KHONG],
+                             "phu_de": [a.PD_XOA, a.PD_CHE, a.PD_XOA_TRONG, a.PD_THUONG, a.PD_KHONG],
                              "thuyet_minh": [a.TM_TU_DONG, a.TM_KHONG],
                              "lam_net": [a.NET_CO, a.NET_KHONG],
                              "giong_2": [a.GIONG2_KHONG] + [k for k, v in a.danh_sach_giong().items() if v[1] != "No"],

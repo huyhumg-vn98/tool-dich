@@ -153,7 +153,7 @@ def tim_lan(mau_thu, W, H):
         # làn chữ nhỏ hơn hẳn làn chính (vd chữ in trên xe) -> không phải phụ đề
         chinh = lan[0][1]
         # làn chữ to hơn hẳn làn chính (vd tên sản phẩm in to) -> cũng không phải phụ đề
-        lan = [(y, c) for y, c in lan if 0.75 * chinh <= c <= 1.3 * chinh]
+        lan = [(y, c) for y, c in lan if 0.65 * chinh <= c <= 1.3 * chinh]
     return lan
 
 
@@ -396,12 +396,19 @@ def lam(video: str, srt: str, ra: str, kieu: str = None, hieu_ung: str = None):
         pass
     su_kien, che, vi_tri_chung = vi_tri(W, H, dong, cau)
     kc = kieu or KIEU_CHE
+    gan_chu = kc != "ai_trong"     # "ai_trong": chỉ AI xoá chữ gốc, không gắn phụ đề Việt
+    if not gan_chu:
+        kc, su_kien = "ai", []
     if kc == "ai":
         sys.path.insert(0, str(Path(__file__).resolve().parent))   # chạy với -I vẫn tìm thấy module
         import xoa_chu_ai
         if not xoa_chu_ai.san_sang():
-            print("  (Chưa có mô hình AI xoá chữ -> dùng khung đen)", flush=True)
-            kc = "den"
+            if gan_chu:
+                print("  (Chưa có mô hình AI xoá chữ -> dùng khung đen)", flush=True)
+                kc = "den"
+            else:   # không gắn chữ Việt -> khung đen không có gì để che; lấp chữ bằng màu nền xung quanh
+                print("  (Chưa có mô hình AI xoá chữ -> lấp chữ bằng màu nền)", flush=True)
+                kc, che = "xoa", dong
     print(f"  Thấy {len(dong)} dòng chữ gốc, che {len(che)} dòng.", flush=True)
 
     def vung_goc(d):
@@ -491,6 +498,8 @@ def lam(video: str, srt: str, ra: str, kieu: str = None, hieu_ung: str = None):
             loc.append("subtitles=sub.ass:fontsdir=fonts")
         else:
             loc.append("subtitles=sub.ass")
+        if not gan_chu:
+            loc = [x for x in loc if not x.startswith("subtitles=")] or ["null"]
         f_loc = Path(tmp) / "loc.txt"
         f_loc.write_text(",".join(loc), encoding="utf-8")  # nhiều dòng che -> ghi bộ lọc ra file
         # Ưu tiên CHẤT LƯỢNG: libx264 CRF thấp = gần như không mất chất lượng so với bản gốc
@@ -504,7 +513,7 @@ def lam(video: str, srt: str, ra: str, kieu: str = None, hieu_ung: str = None):
             r = subprocess.run(lenh, cwd=tmp, capture_output=True, text=True)
             if r.returncode != 0:
                 raise RuntimeError(r.stderr[-1500:])
-    print("  Đã che chữ gốc và gắn phụ đề tiếng Việt.", flush=True)
+    print("  Đã che chữ gốc và gắn phụ đề tiếng Việt." if gan_chu else "  Đã xoá chữ gốc (không gắn phụ đề).", flush=True)
 
 
 def xoa_ai(video, dong, W, H, tmp, f_loc, ma_hoa, hieu_ung=None):

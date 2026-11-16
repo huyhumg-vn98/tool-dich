@@ -45,11 +45,13 @@ Nút trên mỗi video: **■ Dừng** (bấm nhầm), **Làm lại** (chạy l�
 6. Tách giọng gốc khỏi nhạc nền (giữ nhạc + hiệu ứng). **Nhạc nền tự nhỏ lại khi có giọng đọc** (~8 dB), hết giọng to lại
    (chỉnh `auto_dich.py` → HA_NHAC, HA_NHAC_TY_LE), lồng tiếng Việt 6 câu song song; lỗi tạm thời tự thử lại.
 7. Che chữ gốc: tìm "làn phụ đề" (chữ căn giữa, lặp lại cùng chỗ), bỏ qua chữ trong cảnh
-   (biển số, chữ trên xe, bao bì). Có 2 kiểu (chọn ở ô "Phụ đề"):
+   (biển số, chữ trên xe, bao bì). Có 3 kiểu (chọn ở ô "Phụ đề"):
    - **AI xoá sạch** (mặc định): AI (mô hình LaMa) vẽ lại nền chỗ chữ gốc, chữ Trung biến mất hẳn,
      chữ Việt trắng viền đen đặt đúng chỗ đó, không có khung. Chậm hơn (video 18 giây ~2 phút trên Mac M4;
      máy Windows không có card NVIDIA sẽ chậm hơn nhiều).
    - **Khung đen**: chữ Việt trắng trên khung đen phủ lên dòng phụ đề chính. Nhanh.
+   - **Chỉ xoá chữ gốc bằng AI, không gắn phụ đề Việt**: như AI xoá sạch nhưng không đặt chữ Việt lên
+     (video sạch chữ, chỉ có giọng Việt). Máy chưa có mô hình AI thì lấp chữ bằng màu nền xung quanh.
    Video ra chất lượng gần như bản gốc.
 8. Tự kiểm tra câu câm → tự đọc lại và chèn vào (tối đa 2 lần).
 9. Tự dọn file tạm.

@@ -55,6 +55,7 @@ CACH_DICH = {
 }
 PD_XOA = "Che chữ gốc: AI xoá sạch, phụ đề Việt đè lên"   # không khung, chậm hơn
 PD_CHE = "Che chữ gốc, phụ đề Việt đè lên"                 # khung đen
+PD_XOA_TRONG = "Chỉ xoá chữ gốc bằng AI, không gắn phụ đề Việt"
 PD_THUONG = "Phụ đề thường ở dưới video"
 PD_KHONG = "Không gắn phụ đề"
 SUA_CO = "Có - cho tôi sửa phụ đề trước khi lồng tiếng"
@@ -96,11 +97,14 @@ FFMPEG = str(Path(FFMPEG_DIR) / ("ffmpeg.exe" if WIN else "ffmpeg"))
 
 def la_kieu_che(phu_de) -> bool:
     """Kiểu phụ đề 'che chữ gốc' (gồm cả tên cũ '... (khung đen)')."""
-    return phu_de is None or str(phu_de).startswith("Che chữ gốc")
+    return phu_de is None or str(phu_de).startswith("Che chữ gốc") or phu_de == PD_XOA_TRONG
 
 
 def kieu_che(phu_de) -> str:
-    """Cách che cho che_chu.py: 'ai' = AI xoá sạch chữ gốc, 'den' = khung đen."""
+    """Cách che cho che_chu.py: 'ai' = AI xoá sạch chữ gốc, 'ai_trong' = AI xoá, không gắn chữ Việt,
+    'den' = khung đen."""
+    if phu_de == PD_XOA_TRONG:
+        return "ai_trong"
     return "ai" if phu_de is None or phu_de == PD_XOA else "den"
 
 
@@ -169,7 +173,7 @@ def hoi_lua_chon():
         toc_do = chon("Tốc độ đọc:", list(TOC_DO), cu.get("toc_do", ""))
         if toc_do is None:
             return None
-    phu_de = chon("Kiểu phụ đề trên video:", [PD_XOA, PD_CHE, PD_THUONG, PD_KHONG], cu.get("phu_de", PD_XOA))
+    phu_de = chon("Kiểu phụ đề trên video:", [PD_XOA, PD_CHE, PD_XOA_TRONG, PD_THUONG, PD_KHONG], cu.get("phu_de", PD_XOA))
     if phu_de is None:
         return None
     sua = chon("Sửa phụ đề tiếng Việt trước khi lồng tiếng?", [SUA_CO, SUA_KHONG], cu.get("sua", SUA_CO))
