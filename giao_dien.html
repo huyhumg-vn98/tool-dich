@@ -320,8 +320,18 @@ let amThanh = null;
 async function trangThaiAi33() {
   const d = await (await fetch('/api/ai33/status')).json();
   $('#ai33Tt').textContent = !d.co_key ? '· chưa có API key' : d.loi ? '· ' + d.loi : `· còn ${d.credits} credit`;
-  $('#yeuThich').innerHTML = d.yeu_thich.length ? d.yeu_thich.map(g =>
-    `<span class="tag">${esc(g.ten)}<button title="Bỏ" onclick="boGiong('${esc(g.voice_id)}')">✕</button></span>`).join('')
+  yeuThich = d.yeu_thich;
+  veYeuThich();
+}
+let yeuThich = [];
+function veYeuThich() {
+  const ten = g => esc(JSON.stringify(g.ten));
+  $('#yeuThich').innerHTML = yeuThich.length ? yeuThich.map(g => {
+    const chinh = $('#giong').value === 'ai33 · ' + g.ten, hai = $('#giong_2').value === 'ai33 · ' + g.ten;
+    return `<span class="tag">${esc(g.ten)}${chinh ? ' <b>(chính)</b>' : ''}${hai ? ' <b>(người 2)</b>' : ''}
+      <button class="sm" title="Dùng làm giọng chính" onclick="dungGiong(${ten(g)}, false)">Chính</button>
+      <button class="sm" title="Dùng làm giọng người thứ 2 (video 2 người nói)" onclick="dungGiong(${ten(g)}, true)">Người 2</button>
+      <button title="Bỏ" onclick="boGiong('${esc(g.voice_id)}')">✕</button></span>`; }).join('')
     : '<span class="sub">Chưa có. Tìm giọng bên dưới rồi bấm "Thêm".</span>';
 }
 async function luuKey() {
@@ -342,7 +352,8 @@ function dongGiong(g) {
   return `<div class="gv"><div class="nm"><div class="name">${esc(g.name)}</div>
       <div class="sub">${esc(mo_ta.filter(Boolean).join(' · '))}</div></div>
     <div class="row">${g.preview_url ? `<button class="sm" onclick="ngheThu(${i})">▶ Nghe</button>` : ''}
-    <button class="sm pri" onclick="themGiong(${i})">+ Thêm</button></div></div>`;
+    <button class="sm pri" onclick="themGiong(${i})" title="Thêm và dùng làm giọng lồng tiếng chính">+ Thêm</button>
+    <button class="sm" onclick="themGiong(${i}, true)" title="Thêm và dùng làm giọng người thứ 2 (video 2 người nói)">+ Người 2</button></div></div>`;
 }
 
 const MOI_TRANG = 24;
@@ -382,13 +393,19 @@ function ngheThu(i) {
   amThanh = new Audio(dsGiong[i].preview_url);
   amThanh.play();
 }
-async function themGiong(i) {
+async function themGiong(i, nguoi2 = false) {
   const g = dsGiong[i];
   await post('/api/ai33/fav', { voice_id: g.voice_id, ten: g.name });
   await napLuaChon();
-  $('#giong').value = 'ai33 · ' + g.name;
+  dungGiong(g.name, nguoi2);
+}
+// Đặt giọng ai33 đã thêm làm giọng chính hoặc giọng người thứ 2, lưu lựa chọn ngay
+async function dungGiong(ten, nguoi2) {
+  $(nguoi2 ? '#giong_2' : '#giong').value = 'ai33 · ' + ten;
+  await post('/api/lua_chon', { lc: lc() });
   trangThaiAi33();
 }
+for (const k of ['giong', 'giong_2']) $('#' + k).addEventListener('change', veYeuThich);
 async function boGiong(id) {
   await post('/api/ai33/fav', { voice_id: id, bo: true });
   await napLuaChon();
@@ -407,7 +424,7 @@ $('#ai33Box').addEventListener('toggle', e => {
 });
 trangThaiAi33();
 
-napLuaChon();
+napLuaChon().then(veYeuThich);
 ve();
 setInterval(ve, 1500);
 </script>
