@@ -86,7 +86,7 @@ def tai_file(url: str, dich: Path):
 
 def qua_savetik(url: str, thu_muc: Path) -> Path:
     payload = None
-    for lan in range(2):   # SaveTik hay chậm/quá tải tạm thời -> thử lại 1 lần
+    for lan in range(3):   # SaveTik hay chậm/quá tải, mạng chập chờn -> thử lại
         try:
             r = requests.post(
                 SAVETIK_SEARCH_URL,
@@ -102,8 +102,8 @@ def qua_savetik(url: str, thu_muc: Path) -> Path:
             payload = r.json()
             break
         except (requests.RequestException, ValueError) as e:
-            if lan == 1:
-                raise LoiTai("SaveTik không phản hồi (trang đang lỗi hoặc quá tải).") from e
+            if lan == 2:
+                raise LoiTai(f"SaveTik không phản hồi - mạng tới savetik.io lỗi hoặc trang quá tải ({type(e).__name__})") from e
             import time
             time.sleep(5)
     trang = payload.get("data") if isinstance(payload, dict) else None
@@ -119,13 +119,15 @@ def qua_savetik(url: str, thu_muc: Path) -> Path:
     m = re.search(r'id="TikTokId" value="(\d+)"', trang)
     vid = m.group(1) if m else (id_video(url) or "douyin")
     dich = thu_muc / f"douyin_{vid}.mp4"
+    loi_tai = ""
     for link, _ in mp4:
         try:
             tai_file(link, dich)
             return dich
-        except (requests.RequestException, LoiTai, OSError):
+        except (requests.RequestException, LoiTai, OSError) as e:
+            loi_tai = type(e).__name__
             dich.unlink(missing_ok=True)
-    raise LoiTai("Không tải được MP4 từ các link SaveTik.")
+    raise LoiTai(f"Không tải được file MP4 (mạng đứt khi tải: {loi_tai})")
 
 
 def qua_ytdlp(url: str, thu_muc: Path) -> Path:

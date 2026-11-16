@@ -159,6 +159,9 @@ def chay_cho(j):
             raise DaDung()
         cap = kw.pop("capture_output", False)
         kw.pop("check", None)
+        if kw.get("text"):    # luôn đọc kết quả theo UTF-8 (Windows mặc định bảng mã cũ -> lỗi chữ Việt/Trung)
+            kw.setdefault("encoding", "utf-8")
+            kw.setdefault("errors", "replace")
         if not a.WIN:
             kw["start_new_session"] = True   # gom tiến trình con thành 1 nhóm để Dừng tắt được hết
         import os
@@ -213,22 +216,34 @@ def luong_tai():
                 continue
             j["trang_thai"], j["buoc"], j["bat_dau"] = "dang_tai", "Đang tải video...", time.time()
             luu()
+        f, p = "", None
         try:
-            p = chay_cho(j)([str(a.PY_TOOL), "-I", str(GOC / "tai_douyin.py"),
-                             str(a.VAO / "Tai_ve"), j["nguon"]], capture_output=True, text=True)
+            for lan in range(3):     # mạng chập chờn -> tự thử lại 2 lần trước khi nhờ tải tay
+                if lan:
+                    cap_nhat(j, buoc=f"Tải lỗi, đang thử lại lần {lan + 1}/3...")
+                    time.sleep(15)
+                p = chay_cho(j)([str(a.PY_TOOL), "-X", "utf8", "-I", str(GOC / "tai_douyin.py"),
+                                 str(a.VAO / "Tai_ve"), j["nguon"]], capture_output=True, text=True)
+                f = next((l[5:].strip() for l in (p.stdout or "").splitlines() if l.startswith("FILE:")), "")
+                if f and Path(f).exists():
+                    break
         except DaDung:
             continue
-        f = next((l[5:].strip() for l in p.stdout.splitlines() if l.startswith("FILE:")), "")
+        except Exception as e:      # không chạy được chương trình tải (vd thiếu Python) -> báo rõ, không chết luồng
+            p = subprocess.CompletedProcess([], 1, "", f"Lỗi chạy chương trình tải: {e}")
         if f and Path(f).exists():
             cap_nhat(j, video=f, ten=Path(f).name, trang_thai="cho_dich", buoc="")
         else:
-            ly_do = next((l.strip(" ✖") for l in p.stdout.splitlines() if "Không tải được" in l),
-                         "Không tải được video.")
-            # tự tải hỏng (vd SaveTik lỗi) -> cho bạn tải tay qua trang Seekin, app tự nhận file
-            if "SaveTik" in p.stdout:
-                ly_do = "SaveTik đang lỗi hoặc quá tải."
-            cap_nhat(j, trang_thai="cho_tai_tay", loi="Tự tải không được (" + ly_do.replace("Không tải được: ", "") + ")",
-                     buoc="")
+            # ghi đúng lý do thật (SaveTik vì sao lỗi, yt-dlp vì sao lỗi, hoặc chương trình bị lỗi)
+            dong = (p.stdout or "").splitlines() if p else []
+            ly_do = [l.strip().replace("SaveTik lỗi (", "SaveTik: ").replace("), thử yt-dlp...", "")
+                     for l in dong if "SaveTik lỗi (" in l]
+            ly_do += [l.strip(" ✖").replace("Không tải được: ", "") for l in dong if "Không tải được" in l]
+            if not ly_do and p is not None and p.stderr:
+                ly_do = [p.stderr.strip().splitlines()[-1][:200]]
+            cap_nhat(j, trang_thai="cho_tai_tay", buoc="",
+                     loi="Tự tải không được: " + (" | ".join(ly_do) or "không rõ lý do") +
+                         ". Kiểm tra mạng / thử lại sau, hoặc tải tay qua Seekin.")
 
 
 # ---------- Tải tay qua trang web (Seekin) ----------
@@ -382,7 +397,7 @@ def lam_net_neu_can(j, chay) -> Path:
     except Exception:
         return goc
     cap_nhat(j, buoc="AI làm nét video (video mờ)...")
-    r = chay([str(a.PY_TOOL), "-I", str(GOC / "lam_net.py"), str(goc), str(net)], capture_output=True, text=True)
+    r = chay([str(a.PY_TOOL), "-X", "utf8", "-I", str(GOC / "lam_net.py"), str(goc), str(net)], capture_output=True, text=True)
     if r.returncode == 0 and net.exists() and net.stat().st_size > 0:
         cap_nhat(j, video_net=str(net))
         return net
@@ -460,7 +475,7 @@ def xu_ly(j):
         da_che = tam / f"che_{j['id']}.mp4"
         # video không lời có thuyết minh AI -> thêm zoom ở điểm nhấn (chỉ kiểu AI xoá chữ)
         hu = [str(hieu_ung)] if kc == "ai" and hieu_ung.exists() else []
-        r = chay([str(a.PY_TOOL), "-I", str(GOC / "che_chu.py"),
+        r = chay([str(a.PY_TOOL), "-X", "utf8", "-I", str(GOC / "che_chu.py"),
                             str(video_ra), str(srt), str(da_che), kc, *hu], capture_output=True, text=True)
         if r.returncode != 0 or not da_che.exists():
             return cap_nhat(j, trang_thai="loi", loi="Lỗi khi che chữ gốc: " + (r.stderr or r.stdout)[-200:], buoc="")
@@ -468,7 +483,7 @@ def xu_ly(j):
     elif lc.get("phu_de") == a.PD_KHONG and hieu_ung.exists() and video_ra != video:
         cap_nhat(j, buoc="Thêm hiệu ứng zoom chậm...")
         da_zoom = tam / f"zoom_{j['id']}.mp4"
-        r = chay([str(a.PY_TOOL), "-I", str(GOC / "hieu_ung.py"), str(video_ra), str(hieu_ung), str(da_zoom)],
+        r = chay([str(a.PY_TOOL), "-X", "utf8", "-I", str(GOC / "hieu_ung.py"), str(video_ra), str(hieu_ung), str(da_zoom)],
                  capture_output=True, text=True)
         if r.returncode == 0 and da_zoom.exists():
             video_ra = da_zoom

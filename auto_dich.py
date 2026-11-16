@@ -352,7 +352,7 @@ def ham_viet_loi(video: Path, chay=subprocess.run):
     """Tạo hàm cho chay_pvt: AI (DeepSeek) xem video rồi viết lời thuyết minh vào tam/vi.srt."""
     def viet(tam: Path, lang: str):
         vi = tam / f"{NGON_NGU_DICH}.srt"
-        kq = chay([str(PY_TOOL), "-I", str(GOC / "thuyet_minh.py"), str(Path(video).resolve()), str(vi)],
+        kq = chay([str(PY_TOOL), "-X", "utf8", "-I", str(GOC / "thuyet_minh.py"), str(Path(video).resolve()), str(vi)],
                   capture_output=True, text=True)
         if kq.returncode != 0 or not vi.exists():
             return kq
@@ -559,7 +559,7 @@ def dich(video: Path, lc: dict) -> bool:
     if la_kieu_che(lc.get("phu_de")):
         try:
             da_che = tam / f"che_{video.stem}.mp4"
-            subprocess.run([str(PY_TOOL), "-I", str(GOC / "che_chu.py"),
+            subprocess.run([str(PY_TOOL), "-X", "utf8", "-I", str(GOC / "che_chu.py"),
                             str(video_ra), str(srt), str(da_che), kieu_che(lc.get("phu_de"))], check=True)
             video_ra = da_che
         except Exception as e:
@@ -657,7 +657,7 @@ def main():
             hop_thoai("Không tìm thấy link nào trong nội dung đã dán.", ["OK"])
             return
         print("\n==============================\n▶ Tự tải video từ link...")
-        p = subprocess.Popen([str(PY_TOOL), "-I", str(GOC / "tai_douyin.py"),
+        p = subprocess.Popen([str(PY_TOOL), "-X", "utf8", "-I", str(GOC / "tai_douyin.py"),
                               str(VAO / "Tai_ve"), " ".join(links)],
                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         loi = []
