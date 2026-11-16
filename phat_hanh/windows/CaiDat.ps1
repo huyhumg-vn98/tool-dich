@@ -70,8 +70,18 @@ try {
     # ---------- 4. Thư viện Python cho pyVideoTrans ----------
     Buoc "4/6 Cài thư viện Python cho pyVideoTrans (lâu nhất, ~2-3 GB, có thể 10-20 phút)"
     Push-Location "$GOC\pyvideotrans"
-    uv sync
-    if ($LASTEXITCODE -ne 0) { throw "uv sync lỗi" }
+    # --frozen: dùng đúng danh sách phiên bản đã khoá, không phải hỏi lại GitHub.
+    # Bỏ qua giọng đọc Chatterbox (tool không dùng; thư viện của nó phải tải qua Git từ GitHub, mạng VN hay đứt).
+    # Mạng chập chờn -> tự thử lại tối đa 3 lần (phần đã tải được giữ lại, lần sau nhanh hơn).
+    $env:GIT_CONFIG_COUNT = "1"; $env:GIT_CONFIG_KEY_0 = "http.version"; $env:GIT_CONFIG_VALUE_0 = "HTTP/1.1"
+    $ok = $false
+    foreach ($lan in 1..3) {
+        uv sync --frozen --no-install-package resemble-perth --no-install-package chatterbox-tts
+        if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+        Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/3 sau 10 giây..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 10
+    }
+    if (-not $ok) { throw "uv sync lỗi (mạng tới GitHub/PyPI không ổn định - thử lại sau hoặc đổi mạng/4G)" }
     # tạo file cài đặt mặc định của pyVideoTrans (cảnh báo của Python không phải lỗi -> bỏ qua)
     $ErrorActionPreference = "Continue"
     & ".venv\Scripts\python.exe" -c "from videotrans.configure import config" *> $null
@@ -86,8 +96,14 @@ try {
         uv venv --python 3.10 "$GOC\.venv_tool"
     }
     $env:VIRTUAL_ENV = "$GOC\.venv_tool"
-    uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp torch==2.7.0
-    if ($LASTEXITCODE -ne 0) { throw "Cài thư viện OCR lỗi" }
+    $ok = $false
+    foreach ($lan in 1..3) {
+        uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp torch==2.7.0
+        if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+        Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/3 sau 10 giây..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 10
+    }
+    if (-not $ok) { throw "Cài thư viện OCR lỗi (mạng không ổn định - thử lại sau hoặc đổi mạng/4G)" }
     Remove-Item Env:VIRTUAL_ENV
     # Mô hình AI xoá chữ gốc (LaMa, ~200 MB). Tải lỗi thì tool tự dùng kiểu khung đen.
     New-Item -ItemType Directory -Force "$GOC\mo_hinh" | Out-Null

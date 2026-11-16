@@ -22,3 +22,4 @@
 /phat_hanh/*.zip
 .DS_Store
 __pycache__/
+/phat_hanh/gui_windows/
