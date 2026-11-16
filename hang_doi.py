@@ -416,6 +416,16 @@ def xu_ly(j):
     dich = a.CACH_DICH.get(lc.get("dich"), "0")
     tach = lc.get("am_thanh", a.AM_GIU) == a.AM_GIU      # giữ nhạc nền & hiệu ứng
     chay = chay_cho(j)
+    # video 2 người nói: giọng thứ 2 (phải cùng loại giọng với giọng chính, vd cùng ai33 hoặc cùng Edge)
+    ds_giong = a.danh_sach_giong()
+    hai = None
+    g2 = lc.get("giong_2")
+    if g2 and g2 in ds_giong and g2 != lc.get("giong") and giong != "No":
+        t2, v2 = ds_giong[g2]
+        if t2 == tts_type:
+            hai = {"tts": t2, "giong": v2, "ten1": lc.get("giong", ""), "ten2": g2}
+        else:
+            cap_nhat(j, canh_bao="Giọng người thứ 2 phải cùng loại với giọng chính (cùng ai33 hoặc cùng Edge) - dùng 1 giọng.")
     if not j.get("dai"):
         cap_nhat(j, dai=do_dai(video))
     ten_goc = video.stem
@@ -437,7 +447,7 @@ def xu_ly(j):
         shutil.rmtree(tam, ignore_errors=True)
         if sua:
             cap_nhat(j, buoc="Nhận dạng giọng nói & dịch phụ đề...")
-            kq = a.chay_pvt(video, lang, tam, tts_type, "No", toc_do, "0", xoa_cache=True, dich=dich, chay=chay,
+            kq = a.chay_pvt(video, lang, tam, tts_type, "No", toc_do, "0", xoa_cache=True, dich=dich, chay=chay, hai_giong=hai,
                             tach_giong=tach, viet_loi=viet_loi, kieu=kieu_chu_de(j))
             ghi_kieu(j, tam)
             if kq.returncode != 0 or not srt.exists():
@@ -445,7 +455,7 @@ def xu_ly(j):
             return cap_nhat(j, trang_thai="cho_sua", buoc="Chờ bạn sửa phụ đề", gia=a.gia_tien.cau_co_gia(srt, goc_srt))
         # dịch trước, chưa lồng tiếng: có câu nói giá -> dừng lại cho bạn kiểm tra
         cap_nhat(j, buoc="Nhận dạng giọng nói & dịch phụ đề...")
-        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=True, dich=dich, chay=chay,
+        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=True, dich=dich, chay=chay, hai_giong=hai,
                         tach_giong=tach, viet_loi=viet_loi, chi_dich=True, kieu=kieu_chu_de(j))
         ghi_kieu(j, tam)
         if kq.returncode != 0:
@@ -454,14 +464,20 @@ def xu_ly(j):
         if gia and lc.get("sua", a.SUA_GIA) == a.SUA_GIA:
             return cap_nhat(j, trang_thai="cho_sua", gia=gia, buoc="")
         cap_nhat(j, buoc="Lồng tiếng & ghép video...")
-        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=False, dich=dich, chay=chay,
+        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=False, dich=dich, chay=chay, hai_giong=hai,
                         tach_giong=tach)
     elif giong != "No" or kieu_pd != "0":
         cap_nhat(j, buoc="Lồng tiếng & ghép video...")
-        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=False, dich=dich, chay=chay, tach_giong=tach)
+        kq = a.chay_pvt(video, lang, tam, tts_type, giong, toc_do, kieu_pd, xoa_cache=False, dich=dich, chay=chay, hai_giong=hai, tach_giong=tach)
 
     if (kq is not None and kq.returncode != 0) or not srt.exists():
         return cap_nhat(j, trang_thai="loi", loi=mo_ta_loi(kq) if kq else "Thiếu file phụ đề.", buoc="")
+    try:   # nhớ giọng từng câu (để "đọc lại câu câm" dùng đúng giọng) + ghi chú 1 hay 2 người nói
+        if (tam / "hai_giong.json").exists():
+            cap_nhat(j, ghi_chu_giong=json.loads((tam / "hai_giong.json").read_text(encoding="utf-8"))["ghi_chu"])
+        cap_nhat(j, vai=json.loads((tam / "vai.json").read_text(encoding="utf-8")) if (tam / "vai.json").exists() else {})
+    except Exception:
+        pass
     video_ra = next((p for p in tam.glob("*") if p.suffix.lower() in a.DUOI_VIDEO), None)
     if video_ra is None:
         if giong != "No":
@@ -565,10 +581,14 @@ def va_cau_cam(j, tu_dong=False):
     cap_nhat(j, buoc=f"Đọc lại {len(cam)} câu câm...")
     env = dict(__import__("os").environ)
     env["PATH"] = a.PATH_THEM + env.get("PATH", "")
-    r = chay([str(a.PY_PVT), "cli.py", "--task", "tts", "--name", str(mini), "--tts_type", tts_type,
-              "--voice_role", giong, "--voice_rate", toc_do, "--voice_autorate", "--align_sub_audio",
-              "--target_language_code", a.NGON_NGU_DICH, "--output-dir", str(tam / "ra")],
-             cwd=a.PVT, env=env, capture_output=True, text=True)
+    lenh = [str(a.PY_PVT), "cli.py", "--task", "tts", "--name", str(mini), "--tts_type", tts_type,
+            "--voice_role", giong, "--voice_rate", toc_do, "--voice_autorate", "--align_sub_audio",
+            "--target_language_code", a.NGON_NGU_DICH, "--output-dir", str(tam / "ra")]
+    if j.get("vai"):   # video 2 người nói: câu nào đọc lại bằng đúng giọng của người đó
+        vai_mini = {str(i): j["vai"].get(str(n), giong) for i, n in enumerate(cam, 1)}
+        (tam / "vai.json").write_text(json.dumps(vai_mini, ensure_ascii=False), encoding="utf-8")
+        lenh = [str(a.PY_PVT), str(GOC / "chay_vai.py"), str(tam / "vai.json")] + lenh[1:]
+    r = chay(lenh, cwd=a.PVT, env=env, capture_output=True, text=True)
     wav = next((tam / "ra").glob("*.wav"), None) if (tam / "ra").exists() else None
     if r.returncode != 0 or wav is None:
         return cap_nhat(j, trang_thai=tt, va_cau=False, buoc="",
@@ -653,7 +673,7 @@ def lua_chon_mac_dinh():
     try:
         return json.loads(a.LUA_CHON_CU.read_text())
     except Exception:
-        return {"giong": list(a.GIONG)[0], "toc_do": "Bình thường", "phu_de": a.PD_XOA, "sua": a.SUA_KHONG, "lam_net": a.NET_CO}
+        return {"giong": list(a.GIONG)[0], "toc_do": "Bình thường", "phu_de": a.PD_XOA, "sua": a.SUA_KHONG, "lam_net": a.NET_CO, "giong_2": a.GIONG2_KHONG}
 
 
 class XuLy(BaseHTTPRequestHandler):
@@ -695,6 +715,7 @@ class XuLy(BaseHTTPRequestHandler):
                              "phu_de": [a.PD_XOA, a.PD_CHE, a.PD_THUONG, a.PD_KHONG],
                              "thuyet_minh": [a.TM_TU_DONG, a.TM_KHONG],
                              "lam_net": [a.NET_CO, a.NET_KHONG],
+                             "giong_2": [a.GIONG2_KHONG] + [k for k, v in a.danh_sach_giong().items() if v[1] != "No"],
                              "sua": [a.SUA_KHONG, a.SUA_GIA, a.SUA_CO],
                              "dich": list(a.CACH_DICH),
                              "am_thanh": [a.AM_GIU, a.AM_BO], "mac_dinh": lua_chon_mac_dinh()})
@@ -844,7 +865,7 @@ class XuLy(BaseHTTPRequestHandler):
             # làm lại theo lựa chọn đang chọn trên giao diện (không dùng lựa chọn cũ lúc thêm video)
             lc = self.doc_json().get("lc") or lua_chon_mac_dinh()
             cap_nhat(j, trang_thai="cho_dich" if j["video"] else "cho_tai", loi="", buoc="", da_sua=False,
-                     canh_bao="", lang="", gia=[], lc=lc)
+                     canh_bao="", lang="", gia=[], lc=lc, vai={}, ghi_chu_giong="")
             return self.gui({"ok": True})
         if u.path == "/api/delete":
             if j["trang_thai"] in DANG_CHAY:

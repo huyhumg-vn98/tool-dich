@@ -38,6 +38,10 @@ Nút trên mỗi video: **■ Dừng** (bấm nhầm), **Làm lại** (chạy l�
    - **Chống đọc nhanh**: câu dịch nào quá nhiều chữ so với thời gian (trên 5 tiếng/giây) thì DeepSeek tự viết
      ngắn lại; còn chật thì mượn thêm tối đa 0,6 giây từ câu bên cạnh đang dư. Chỉnh ở đầu `rut_gon.py`
      (TOC_DO_TOI_DA, LECH_TOI_DA). Cần API key DeepSeek; không có key thì bỏ qua bước viết ngắn.
+   - **Video 2 người nói** (ô "Giọng người thứ 2"): chọn thêm 1 giọng (cùng loại với giọng chính: cùng ai33 hoặc
+     cùng Edge). Tool tự nhận ai nói câu nào, đo giọng trầm/cao: người giọng trầm đọc bằng giọng nam, giọng cao
+     đọc bằng giọng nữ. Video chỉ có 1 người nói thì vẫn giữ đúng giọng chính. Hàng chờ hiện "👥 2 giọng" khi có tách.
+     Chỉnh ngưỡng: đầu file `hai_giong.py` (NGUONG_NAM_NU, CHENH_TOI_THIEU).
 6. Tách giọng gốc khỏi nhạc nền (giữ nhạc + hiệu ứng). **Nhạc nền tự nhỏ lại khi có giọng đọc** (~8 dB), hết giọng to lại
    (chỉnh `auto_dich.py` → HA_NHAC, HA_NHAC_TY_LE), lồng tiếng Việt 6 câu song song; lỗi tạm thời tự thử lại.
 7. Che chữ gốc: tìm "làn phụ đề" (chữ căn giữa, lặp lại cùng chỗ), bỏ qua chữ trong cảnh

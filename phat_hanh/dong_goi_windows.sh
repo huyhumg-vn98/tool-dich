@@ -7,7 +7,7 @@ RA="$GOC/phat_hanh"
 TAM="$(mktemp -d)/DichVideo"
 mkdir -p "$TAM"
 
-for f in auto_dich.py hang_doi.py che_chu.py ai33.py deepseek_cfg.py tai_douyin.py xoa_chu_ai.py thuyet_minh.py hieu_ung.py gia_tien.py rut_gon.py lam_net.py viet_lai.py giao_dien.html \
+for f in auto_dich.py hang_doi.py che_chu.py ai33.py deepseek_cfg.py tai_douyin.py xoa_chu_ai.py thuyet_minh.py hieu_ung.py gia_tien.py rut_gon.py lam_net.py viet_lai.py hai_giong.py chay_vai.py giao_dien.html \
          HUONG_DAN.md cai_dat_cfg.py; do
   cp "$GOC/$f" "$TAM/"
 done

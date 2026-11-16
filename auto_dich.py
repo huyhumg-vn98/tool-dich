@@ -66,6 +66,7 @@ TM_TU_DONG = "Video không có lời: AI viết lời giới thiệu sản phẩ
 TM_KHONG = "Video không có lời: bỏ qua (báo lỗi)"
 NET_CO = "Làm nét video mờ bằng AI (video dưới 1080p, chậm hơn)"
 NET_KHONG = "Không làm nét"
+GIONG2_KHONG = "Không (video 1 người nói)"
 
 GOC = Path(__file__).resolve().parent
 sys.path.insert(0, str(GOC))
@@ -201,7 +202,7 @@ def nhan_dien_ngon_ngu(video: Path, chay=subprocess.run) -> str:
 def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
              toc_do: str, phu_de: str, xoa_cache: bool, dich: str = "0", chay=subprocess.run,
              tach_giong: bool = False, viet_loi=None, chi_dich: bool = False,
-             kieu: str = None) -> subprocess.CompletedProcess:
+             kieu: str = None, hai_giong: dict = None) -> subprocess.CompletedProcess:
     """viet_loi(tam, lang): hàm viết lời thuyết minh khi video không có lời nói (None = không viết).
     Trả về None nếu viết xong (đã có tam/vi.srt), hoặc CompletedProcess báo lỗi.
     chi_dich=True: chỉ nghe + dịch ra tam/vi.srt rồi dừng (chưa lồng tiếng) để kiểm tra trước."""
@@ -217,7 +218,7 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
     if xoa_cache:
         # Lần chạy mới: tự nghe trước để sửa câu bị cắt vụn, rồi pyVideoTrans dịch + lồng tiếng từ file đã sửa
         shutil.rmtree(tam, ignore_errors=True)
-        kq = nghe(Path(video).resolve(), lang, tam, env, chay)
+        kq = nghe(Path(video).resolve(), lang, tam, env, chay, hai_nguoi=bool(hai_giong))
         goc = tam / f"{lang}.srt"
         if viet_loi is not None and (kq.returncode != 0 or not goc.exists() or khong_co_loi(goc, video)):
             loi = viet_loi(tam, lang)
@@ -252,6 +253,9 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
     ]
     if not xoa_cache:
         lenh.append("--no-clear-cache")  # giữ phụ đề đã sửa, bỏ qua bước nhận dạng + dịch
+    vai = chia_vai(video, tam, lang, giong, tts_type, hai_giong) if giong != "No" else None
+    if vai:   # video 2 người nói: mỗi câu 1 giọng riêng
+        lenh = [str(PY_PVT), str(GOC / "chay_vai.py"), str(vai)] + lenh[1:]
     kq = chay(lenh, cwd=PVT, env=env, capture_output=True, text=True)
     if hien:
         gia_tien.tra_hien(vi, hien)      # phụ đề hiện trên video giữ dạng số (9,9 tệ)
@@ -268,6 +272,36 @@ def hoan_thien_phu_de(vi: Path, goc: Path, kieu: str = None):
     import rut_gon
     rut_gon.rut_gon(vi)
     rut_gon.chia_lai_thoi_gian(vi)
+
+
+def chia_vai(video, tam: Path, lang: str, giong: str, tts_type: str, hai_giong: dict):
+    """Video 2 người nói -> tam/vai.json {số câu: giọng}. Trả về đường dẫn file, hoặc None nếu dùng 1 giọng."""
+    try:
+        if not hai_giong or hai_giong.get("tts") != tts_type or not hai_giong.get("giong") \
+                or hai_giong["giong"] == giong or not (tam / "nguoi_noi.json").exists():
+            return None
+        nguoi = json.loads((tam / "nguoi_noi.json").read_text(encoding="utf-8"))
+        k_goc = gia_tien._doc_srt(tam / f"{lang}.srt")
+        k_vi = gia_tien._doc_srt(tam / f"{NGON_NGU_DICH}.srt")
+        if not (len(nguoi) == len(k_goc) == len(k_vi)):
+            return None
+        import hai_giong as hg
+        moc = []
+        for _, t, _ in k_goc:
+            a, b = t.split("-->")
+            h1, m1, r1 = a.strip().split(":"); h2, m2, r2 = b.strip().split(":")
+            moc.append((int(h1) * 3600 + int(m1) * 60 + float(r1.replace(",", ".")),
+                        int(h2) * 3600 + int(m2) * 60 + float(r2.replace(",", "."))))
+        kq = hg.gan_giong(video, moc, nguoi, giong, hai_giong["giong"], FFMPEG,
+                          hai_giong.get("ten1", ""), hai_giong.get("ten2", ""))
+        (tam / "hai_giong.json").write_text(json.dumps({"ghi_chu": kq["ghi_chu"]}, ensure_ascii=False), encoding="utf-8")
+        if all(v == giong for v in kq["vai"]):
+            return None
+        f = tam / "vai.json"
+        f.write_text(json.dumps({k[0]: v for k, v in zip(k_vi, kq["vai"])}, ensure_ascii=False), encoding="utf-8")
+        return f
+    except Exception:
+        return None
 
 
 def dich_rieng(goc: Path, lang: str, dich: str, tam: Path, env: dict, chay=subprocess.run):
@@ -331,17 +365,26 @@ def dat_luat_gia_tien():
         pass
 
 
-def nghe(video: Path, lang: str, tam: Path, env: dict, chay=subprocess.run) -> subprocess.CompletedProcess:
+def nghe(video: Path, lang: str, tam: Path, env: dict, chay=subprocess.run, hai_nguoi: bool = False) -> subprocess.CompletedProcess:
     """Bước nghe: chuyển lời nói thành phụ đề gốc tam/<lang>.srt, rồi gộp các câu bị cắt vụn."""
     tam.mkdir(parents=True, exist_ok=True)
     tam_nghe = tam / "_nghe"
     shutil.rmtree(tam_nghe, ignore_errors=True)
     kq = chay([str(PY_PVT), "cli.py", "--task", "stt", "--name", str(video),
                "--source_language_code", lang, "--recogn_type", "0", "--model_name", MO_HINH,
-               "--output-dir", str(tam_nghe), "--cuda"], cwd=PVT, env=env, capture_output=True, text=True)
+               "--output-dir", str(tam_nghe), "--cuda",
+               *(["--enable_diariz", "--nums_diariz", "2"] if hai_nguoi else [])],   # video 2 người: tách người nói
+              cwd=PVT, env=env, capture_output=True, text=True)
     srt = next(tam_nghe.glob("*.srt"), None) if tam_nghe.exists() else None
     if kq.returncode == 0 and srt:
-        gop_cau_vun(srt, tam / f"{lang}.srt")
+        nguoi = None
+        try:
+            nguoi = json.loads((tam_nghe / "speaker.json").read_text(encoding="utf-8")) if hai_nguoi else None
+        except Exception:
+            pass
+        nguoi = gop_cau_vun(srt, tam / f"{lang}.srt", nguoi=nguoi)
+        if hai_nguoi and any(nguoi):
+            (tam / "nguoi_noi.json").write_text(json.dumps(nguoi), encoding="utf-8")
         if lang.startswith("zh"):
             gia_tien.sua_goc(tam / f"{lang}.srt")    # "九块九" -> "9.9元" để dịch đúng giá
     shutil.rmtree(tam_nghe, ignore_errors=True)
@@ -396,7 +439,8 @@ def khong_co_loi(srt: Path, video: Path) -> bool:
     return False
 
 
-def gop_cau_vun(vao: Path, ra: Path, it_chu: int = 2, ngan: float = 0.5, khe: float = 0.35, dai_nhat: float = 6.0):
+def gop_cau_vun(vao: Path, ra: Path, it_chu: int = 2, ngan: float = 0.5, khe: float = 0.35, dai_nhat: float = 6.0,
+                nguoi: list = None):
     """Gộp câu quá ngắn (<= it_chu chữ hoặc < ngan giây) vào câu sát bên cạnh.
 
     Ví dụ "关" | "注我后续..." -> "关注我后续...". Chỉ gộp khi 2 câu cách nhau < khe giây
@@ -414,15 +458,16 @@ def gop_cau_vun(vao: Path, ra: Path, it_chu: int = 2, ngan: float = 0.5, khe: fl
         return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
 
     cau = []
-    for k in _re.split(r"\n\s*\n", vao.read_text(encoding="utf-8-sig").strip()):
+    for so, k in enumerate(_re.split(r"\n\s*\n", vao.read_text(encoding="utf-8-sig").strip())):
         ls = k.strip().splitlines()
         i = next((n for n, l in enumerate(ls) if "-->" in l), None)
         if i is None:
             continue
         a, b = ls[i].split("-->")
         chu = " ".join(l.strip() for l in ls[i + 1:] if l.strip())
+        chu = _re.sub(r"^\[spk\d+\]\s*", "", chu)          # nhãn người nói do bước tách người nói chèn vào
         if chu:
-            cau.append([giay(a), giay(b), chu])
+            cau.append([giay(a), giay(b), chu, nguoi[so] if nguoi and so < len(nguoi) else ""])
 
     def so_chu(s):
         return len(_re.sub(r"[\s\W\d_]", "", s))
@@ -430,15 +475,16 @@ def gop_cau_vun(vao: Path, ra: Path, it_chu: int = 2, ngan: float = 0.5, khe: fl
     doi = True
     while doi:
         doi = False
-        for n, (a, b, chu) in enumerate(cau):
+        for n, (a, b, chu, sp) in enumerate(cau):
             if so_chu(chu) > it_chu and b - a >= ngan:
                 continue
             truoc = cau[n - 1] if n > 0 else None
             sau = cau[n + 1] if n + 1 < len(cau) else None
-            gan_truoc = truoc and a - truoc[1] < khe and b - truoc[0] <= dai_nhat
-            gan_sau = sau and sau[0] - b < khe and sau[1] - a <= dai_nhat
+            # không gộp lời của 2 người khác nhau
+            gan_truoc = truoc and truoc[3] == sp and a - truoc[1] < khe and b - truoc[0] <= dai_nhat
+            gan_sau = sau and sau[3] == sp and sau[0] - b < khe and sau[1] - a <= dai_nhat
             # chỉ 1 chữ (vd "关" của "关注"): gần như luôn là nửa đầu của từ ở câu sau -> ưu tiên gộp về sau
-            mot_chu_ve_sau = so_chu(chu) <= 1 and sau and sau[0] - b < 2.0 and sau[1] - a <= dai_nhat
+            mot_chu_ve_sau = so_chu(chu) <= 1 and sau and sau[3] == sp and sau[0] - b < 2.0 and sau[1] - a <= dai_nhat
             if mot_chu_ve_sau or (gan_sau and (not gan_truoc or sau[0] - b <= a - truoc[1])):
                 sau[0], sau[2] = a, (chu + sau[2]) if so_chu(chu) <= it_chu else f"{chu} {sau[2]}"
             elif gan_truoc:
@@ -449,8 +495,9 @@ def gop_cau_vun(vao: Path, ra: Path, it_chu: int = 2, ngan: float = 0.5, khe: fl
             doi = True
             break
 
-    ra.write_text("\n\n".join(f"{n}\n{tg(a)} --> {tg(b)}\n{chu}" for n, (a, b, chu) in enumerate(cau, 1)) + "\n",
+    ra.write_text("\n\n".join(f"{n}\n{tg(a)} --> {tg(b)}\n{chu}" for n, (a, b, chu, _) in enumerate(cau, 1)) + "\n",
                   encoding="utf-8")
+    return [c[3] for c in cau]
 
 
 def luu_va_dong_textedit(srt: Path):

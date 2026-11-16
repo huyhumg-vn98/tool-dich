@@ -106,6 +106,7 @@
       <div><label class="f" for="thuyet_minh">Video không có lời nói</label><select id="thuyet_minh"></select></div>
       <div><label class="f" for="sua">Sửa phụ đề trước khi lồng tiếng</label><select id="sua"></select></div>
       <div><label class="f" for="lam_net">Làm nét video</label><select id="lam_net"></select></div>
+      <div><label class="f" for="giong_2" title="Video có 2 người nói (vd nam + nữ): tool tự nhận ai nói câu nào, người giọng trầm dùng giọng nam, giọng cao dùng giọng nữ. Chọn cùng loại với giọng chính (cùng ai33 hoặc cùng Edge).">Giọng người thứ 2 (video 2 người nói)</label><select id="giong_2"></select></div>
     </div>
     <div class="row">
       <button class="pri" onclick="themLink()">Thêm vào hàng chờ</button>
@@ -195,7 +196,7 @@ async function post(url, body) {
 }
 function lc() {
   return { giong: $('#giong').value, toc_do: $('#toc_do').value, phu_de: $('#phu_de').value,
-           dich: $('#dich').value, am_thanh: $('#am_thanh').value, thuyet_minh: $('#thuyet_minh').value, lam_net: $('#lam_net').value,
+           dich: $('#dich').value, am_thanh: $('#am_thanh').value, thuyet_minh: $('#thuyet_minh').value, lam_net: $('#lam_net').value, giong_2: $('#giong_2').value,
            sua: $('#sua').value };
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -203,7 +204,7 @@ function thoiGian(giay) { giay = Math.max(0, Math.round(giay)); return `${Math.f
 
 async function napLuaChon() {
   const o = await (await fetch('/api/options')).json();
-  for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net']) {
+  for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net', 'giong_2']) {
     const dangChon = $('#' + k).value;
     $('#' + k).innerHTML = o[k].map(v => `<option>${esc(v)}</option>`).join('');
     const muon = dangChon || o.mac_dinh[k];
@@ -211,7 +212,7 @@ async function napLuaChon() {
   }
 }
 
-for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net'])
+for (const k of ['giong', 'toc_do', 'phu_de', 'dich', 'am_thanh', 'thuyet_minh', 'sua', 'lam_net', 'giong_2'])
   $('#' + k).addEventListener('change', () => post('/api/lua_chon', { lc: lc() }));
 
 async function themLink() {
@@ -268,7 +269,7 @@ async function ve() {
     if (!chay) acts.push(`<button class="sm" onclick="xoa('${j.id}')">Xoá</button>`);
     return `<div class="job">
       <div><div class="name">${esc(ten)}</div>${sub}
-        <div class="sub">${j.chu_de ? '📁 ' + esc(j.chu_de) + ' · ' : ''}${j.kieu_nd ? '🏷 ' + esc(j.kieu_nd) + ' · ' : ''}${esc(j.lc.giong)} · ${esc(j.lc.phu_de)}</div></div>
+        <div class="sub">${j.chu_de ? '📁 ' + esc(j.chu_de) + ' · ' : ''}${j.kieu_nd ? '🏷 ' + esc(j.kieu_nd) + ' · ' : ''}${j.ghi_chu_giong && j.ghi_chu_giong.startsWith('2') ? '👥 2 giọng · ' : ''}${esc(j.lc.giong)} · ${esc(j.lc.phu_de)}</div></div>
       <div><span class="chip ${kieu}">${chay ? '<span class="dot"></span>' : ''}${nhan}</span></div>
       <div class="acts">${acts.join('')}</div></div>`;
   }).join('');

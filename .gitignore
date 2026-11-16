@@ -13,6 +13,8 @@
 !/rut_gon.py
 !/lam_net.py
 !/viet_lai.py
+!/hai_giong.py
+!/chay_vai.py
 !/ai33.py
 !/deepseek_cfg.py
 !/tai_douyin.py
@@ -24,3 +26,4 @@
 .DS_Store
 __pycache__/
 /phat_hanh/gui_windows/
+/phat_hanh/cap_nhat_windows/
