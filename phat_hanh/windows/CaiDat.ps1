@@ -38,6 +38,51 @@ function TaiFile($url, $dich, $hash = "") {
 try {
     Write-Host "Thư mục cài: $GOC"
 
+    # ---------- 0. Kiểm tra cấu hình máy ----------
+    Buoc "0/6 Kiểm tra cấu hình máy"
+    if (-not [Environment]::Is64BitOperatingSystem) { throw "Tool cần Windows 64-bit." }
+    $cpu = (Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1).Name
+    $ram = [math]::Round((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).TotalPhysicalMemory / 1GB)
+    $cards = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)
+    $nv = @($cards | Where-Object { $_.Name -match 'NVIDIA' })
+    $NVIDIA = $nv.Count -gt 0
+    $trong = [math]::Round((Get-PSDrive $GOC.Substring(0, 1)).Free / 1GB)
+    Write-Host "  CPU : $cpu"
+    Write-Host "  RAM : $ram GB"
+    Write-Host "  Card: $(($cards | ForEach-Object { $_.Name }) -join ' | ')"
+    Write-Host "  Ổ $($GOC.Substring(0, 2)) còn trống: $trong GB"
+    if ($NVIDIA) {
+        Write-Host "  => Có card NVIDIA ($($nv[0].Name)): cài bản AI chạy bằng card (nhanh, tải ~3.3 GB)." -ForegroundColor Green
+        try {
+            $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+            if (-not $smi -and (Test-Path "$env:SystemRoot\System32\nvidia-smi.exe")) { $smi = "$env:SystemRoot\System32\nvidia-smi.exe" }
+            if ($smi) {
+                $dv = (& $smi --query-gpu=driver_version --format=csv,noheader 2>$null | Select-Object -First 1)
+                if ($dv) {
+                    Write-Host "  Driver NVIDIA: $dv"
+                    if ([int]($dv.Split('.')[0]) -lt 570) {
+                        Write-Host "  ! Driver NVIDIA cũ (cần bản 570 trở lên cho card mới / CUDA 12.8). Hãy cập nhật driver qua" -ForegroundColor Yellow
+                        Write-Host "    NVIDIA App hoặc nvidia.com. Chưa cập nhật thì tool vẫn chạy, nhưng bằng CPU (chậm hơn)." -ForegroundColor Yellow
+                    }
+                }
+            }
+        } catch { }
+    } else {
+        Write-Host "  => Không có card NVIDIA: cài bản AI chạy bằng CPU (nhẹ hơn, ~0.2 GB). Bước AI xoá chữ / làm nét sẽ chậm hơn." -ForegroundColor Yellow
+    }
+    $can = if ($NVIDIA) { 15 } else { 9 }
+    if ($trong -lt $can) { throw "Ổ $($GOC.Substring(0, 2)) chỉ còn $trong GB trống, cần ít nhất $can GB. Dọn bớt hoặc giải nén tool sang ổ khác." }
+    if ($ram -lt 8) { Write-Host "  ! RAM dưới 8 GB: tool vẫn chạy nhưng có thể chậm / thiếu bộ nhớ với video dài." -ForegroundColor Yellow }
+    if ($NVIDIA) {
+        $TORCH_KIEU = "cu128"
+        $TORCH_URL = "https://download-r2.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp310-cp310-win_amd64.whl"
+        $TORCH_HASH = "5174f02de8ca14df87c8e333c4c39cf3ce93a323c9d470d690301d110a053b3c"
+    } else {
+        $TORCH_KIEU = "cpu"
+        $TORCH_URL = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp310-cp310-win_amd64.whl"
+        $TORCH_HASH = "b4cc706973655151f198d027ed34c92ab31a3db55676b44251194e1280631426"
+    }
+
     # ---------- 1. uv (quản lý Python) ----------
     Buoc "1/6 Cài uv (công cụ cài Python)"
     $uvDir = "$env:USERPROFILE\.local\bin"
@@ -96,13 +141,14 @@ try {
 
     # ---------- 4. Thư viện Python cho pyVideoTrans ----------
     Buoc "4/6 Cài thư viện Python cho pyVideoTrans (lâu nhất, ~3-5 GB, có thể 15-40 phút tuỳ mạng)"
-    # File lớn nhất (torch cho card NVIDIA, ~3.3 GB) + pynini (trên GitHub) tải trước bằng curl -> tải tiếp được khi đứt.
+    # File lớn nhất (torch: bản card NVIDIA ~3.3 GB / bản CPU ~0.2 GB) + pynini (trên GitHub) tải trước bằng curl
+    # -> tải tiếp được khi đứt.
     $GOI = "$GOC\goi_tai"
     New-Item -ItemType Directory -Force $GOI | Out-Null
-    $TORCH = "$GOI\torch-2.7.1+cu128-cp310-cp310-win_amd64.whl"
+    $TORCH = "$GOI\torch-2.7.1+$TORCH_KIEU-cp310-cp310-win_amd64.whl"
     $PYNINI = "$GOI\pynini-2.1.6.post1-cp310-cp310-win_amd64.whl"
-    Write-Host "Tải torch (~3.3 GB, tải tiếp được khi mạng đứt)..."
-    TaiFile "https://download-r2.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp310-cp310-win_amd64.whl" $TORCH "5174f02de8ca14df87c8e333c4c39cf3ce93a323c9d470d690301d110a053b3c"
+    Write-Host "Tải torch bản $TORCH_KIEU (tải tiếp được khi mạng đứt)..."
+    TaiFile $TORCH_URL $TORCH $TORCH_HASH
     TaiFile "https://github.com/billwuhao/pynini-windows-wheels/releases/download/v2.1.6.post1/pynini-2.1.6.post1-cp310-cp310-win_amd64.whl" $PYNINI "18be20f369f86355a12f9bad76bd17f1235df32cd72df6564f068b0e4f4f1911"
     $env:UV_HTTP_TIMEOUT = "600"; $env:UV_HTTP_RETRIES = "10"
     Push-Location "$GOC\pyvideotrans"
@@ -120,6 +166,7 @@ try {
     $uriPynini = ([System.Uri]$PYNINI).AbsoluteUri
     $ds = Get-Content "$GOI\thu_vien.txt" | ForEach-Object {
         if ($_ -match '^torch==2\.7\.1\+cu128') { "torch @ $uriTorch ; sys_platform == 'win32'" }
+        elseif ($_ -match '^torchaudio==2\.7\.1\+cu128') { "torchaudio==2.7.1+$TORCH_KIEU ; sys_platform == 'win32'" }
         elseif ($_ -match '^pynini @ ') { "pynini @ $uriPynini ; sys_platform == 'win32'" }
         else { $_ }
     }
@@ -129,7 +176,7 @@ try {
     $ok = $false
     foreach ($lan in 1..5) {
         # --no-deps: cài đúng y danh sách đã khoá (đã gồm mọi thư viện phụ), không giải lại phiên bản
-        uv pip install -r "$GOI\thu_vien_win.txt" --no-deps --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
+        uv pip install -r "$GOI\thu_vien_win.txt" --no-deps --extra-index-url https://download.pytorch.org/whl/$TORCH_KIEU --index-strategy unsafe-best-match
         if ($LASTEXITCODE -eq 0) { $ok = $true; break }
         Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/5 sau 10 giây (gói đã tải xong được giữ)..." -ForegroundColor Yellow
         Start-Sleep -Seconds 10
@@ -155,8 +202,8 @@ try {
     $env:VIRTUAL_ENV = "$GOC\.venv_tool"
     $ok = $false
     foreach ($lan in 1..3) {
-        # dùng chung file torch đã tải (bản cho card NVIDIA) -> AI xoá chữ / làm nét chạy bằng GPU nếu có
-        uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp "$TORCH" --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
+        # dùng chung file torch đã tải (có card NVIDIA -> AI xoá chữ / làm nét chạy bằng card)
+        uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp "$TORCH" --extra-index-url https://download.pytorch.org/whl/$TORCH_KIEU --index-strategy unsafe-best-match
         if ($LASTEXITCODE -eq 0) { $ok = $true; break }
         Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/3 sau 10 giây..." -ForegroundColor Yellow
         Start-Sleep -Seconds 10

@@ -248,6 +248,7 @@ def chay_pvt(video: Path, lang: str, tam: Path, tts_type: str, giong: str,
         "--subtitle_type", phu_de,
         *(["--is_separate"] if tach_giong and giong != "No" else []),  # tách giọng gốc, giữ nhạc nền
         "--output-dir", str(tam),
+        "--cuda",      # có card NVIDIA chạy được thì dùng card (không có thì pyVideoTrans tự bỏ qua)
     ]
     if not xoa_cache:
         lenh.append("--no-clear-cache")  # giữ phụ đề đã sửa, bỏ qua bước nhận dạng + dịch
@@ -337,7 +338,7 @@ def nghe(video: Path, lang: str, tam: Path, env: dict, chay=subprocess.run) -> s
     shutil.rmtree(tam_nghe, ignore_errors=True)
     kq = chay([str(PY_PVT), "cli.py", "--task", "stt", "--name", str(video),
                "--source_language_code", lang, "--recogn_type", "0", "--model_name", MO_HINH,
-               "--output-dir", str(tam_nghe)], cwd=PVT, env=env, capture_output=True, text=True)
+               "--output-dir", str(tam_nghe), "--cuda"], cwd=PVT, env=env, capture_output=True, text=True)
     srt = next(tam_nghe.glob("*.srt"), None) if tam_nghe.exists() else None
     if kq.returncode == 0 and srt:
         gop_cau_vun(srt, tam / f"{lang}.srt")

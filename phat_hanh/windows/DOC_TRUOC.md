@@ -4,6 +4,10 @@
 - Windows 10 hoặc 11, bản 64-bit.
 - Trống khoảng **10 GB** ổ cứng, có mạng ổn định.
 - Có card NVIDIA thì chạy nhanh hơn, không có vẫn chạy được.
+- Bộ cài **tự kiểm tra cấu hình máy** trước (CPU, RAM, card, ổ trống):
+  - Có card NVIDIA: cài bản AI chạy bằng card (tải ~3.3 GB). Driver NVIDIA nên từ bản 570 trở lên (bộ cài sẽ nhắc nếu cũ).
+  - Không có card NVIDIA: cài bản chạy bằng CPU (nhẹ hơn nhiều, ~0.2 GB), AI xoá chữ / làm nét chậm hơn.
+  - Ổ không đủ chỗ (cần ~15 GB nếu có card, ~9 GB nếu không) thì báo ngay, chưa tải gì.
 
 ## Cài (chỉ làm 1 lần)
 1. **Giải nén** file zip vào nơi muốn để tool, ví dụ `D:\DichVideo`.
