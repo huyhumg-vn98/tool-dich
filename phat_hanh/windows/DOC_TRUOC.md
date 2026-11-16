@@ -11,7 +11,9 @@
    - Nên để ở đường dẫn ngắn, không dấu. Đừng di chuyển thư mục sau khi cài.
 2. Bấm đúp **`CaiDat.bat`**.
    - Nếu Windows hiện "Windows protected your PC": bấm **More info** → **Run anyway**.
-3. Chờ cửa sổ chạy xong, thấy dòng **"✔ CÀI ĐẶT XONG!"** là xong. Mất khoảng 15–30 phút tuỳ mạng.
+3. Chờ cửa sổ chạy xong, thấy dòng **"✔ CÀI ĐẶT XONG!"** là xong. Mất khoảng 15–40 phút tuỳ mạng (tải ~4-5 GB).
+   - Mạng đứt: bộ cài **tự tải tiếp** từ chỗ đứt. Nếu cửa sổ báo lỗi hoặc lỡ tắt, bấm đúp lại `CaiDat.bat`:
+     phần đã tải được giữ, không tải lại từ đầu (file lớn tạm nằm ở thư mục `goi_tai`).
 
 ## Dùng
 - Bấm đúp lối tắt **"Dich Video"** trên Desktop. Giao diện mở trên trình duyệt.

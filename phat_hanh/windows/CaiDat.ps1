@@ -13,6 +13,28 @@ $GIT_ZIP = "https://github.com/git-for-windows/git/releases/download/v2.47.1.win
 
 function Buoc($t) { Write-Host "`n==> $t" -ForegroundColor Green }
 
+# Tải 1 file lớn bằng curl: mạng đứt thì TẢI TIẾP từ chỗ đứt (không tải lại từ đầu).
+# Đóng cửa sổ / chạy lại CaiDat.bat cũng giữ phần đã tải (file .tam).
+function TaiFile($url, $dich, $hash = "") {
+    if (Test-Path $dich) { return }
+    $tam = "$dich.tam"
+    $ma = 1
+    foreach ($lan in 1..30) {
+        & curl.exe -fL --retry 10 --retry-delay 5 --retry-all-errors --connect-timeout 30 -C - -o $tam $url
+        $ma = $LASTEXITCODE
+        if ($ma -eq 0) { break }
+        if ($ma -eq 33 -or $ma -eq 36) { Remove-Item $tam -ErrorAction SilentlyContinue }   # máy chủ không cho tải tiếp -> tải lại
+        Write-Host "Mạng bị đứt - tự tải tiếp (lần $($lan + 1)/30), phần đã tải vẫn giữ..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 5
+    }
+    if ($ma -ne 0) { throw "Không tải được $url - mạng quá yếu. Chạy lại CaiDat.bat sẽ tải tiếp phần còn lại." }
+    if ($hash -and ((Get-FileHash $tam -Algorithm SHA256).Hash.ToLower() -ne $hash)) {
+        Remove-Item $tam -ErrorAction SilentlyContinue
+        throw "File tải về bị hỏng ($dich). Chạy lại CaiDat.bat để tải lại."
+    }
+    Move-Item -Force $tam $dich
+}
+
 try {
     Write-Host "Thư mục cài: $GOC"
 
@@ -34,7 +56,7 @@ try {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
             Write-Host "Máy chưa có Git - đang tải bản Git gọn..."
             $zip = "$env:TEMP\dichvideo_git.zip"
-            Invoke-WebRequest $GIT_ZIP -OutFile $zip
+            TaiFile $GIT_ZIP $zip
             if (Test-Path "$GOC\git") { Remove-Item "$GOC\git" -Recurse -Force }
             Expand-Archive $zip "$GOC\git" -Force
             Remove-Item $zip -Force -ErrorAction SilentlyContinue
@@ -50,7 +72,7 @@ try {
     if (-not (Test-Path "$GOC\ffmpeg\bin\ffmpeg.exe")) {
         $zip = "$env:TEMP\dichvideo_ffmpeg.zip"
         $tam = "$env:TEMP\dichvideo_ffmpeg"
-        Invoke-WebRequest $FFMPEG_ZIP -OutFile $zip
+        TaiFile $FFMPEG_ZIP $zip
         if (Test-Path $tam) { Remove-Item $tam -Recurse -Force }
         Expand-Archive $zip $tam -Force
         $d = Get-ChildItem $tam -Directory | Select-Object -First 1
@@ -64,7 +86,7 @@ try {
     if (-not (Test-Path "$GOC\pyvideotrans\pyproject.toml")) {
         $zip = "$env:TEMP\dichvideo_pvt.zip"
         $tam = "$env:TEMP\dichvideo_pvt"
-        Invoke-WebRequest "https://github.com/jianchang512/pyvideotrans/archive/$PVT_COMMIT.zip" -OutFile $zip
+        TaiFile "https://github.com/jianchang512/pyvideotrans/archive/$PVT_COMMIT.zip" $zip
         if (Test-Path $tam) { Remove-Item $tam -Recurse -Force }
         Expand-Archive $zip $tam -Force
         $d = Get-ChildItem $tam -Directory | Select-Object -First 1
@@ -73,20 +95,47 @@ try {
     }
 
     # ---------- 4. Thư viện Python cho pyVideoTrans ----------
-    Buoc "4/6 Cài thư viện Python cho pyVideoTrans (lâu nhất, ~2-3 GB, có thể 10-20 phút)"
+    Buoc "4/6 Cài thư viện Python cho pyVideoTrans (lâu nhất, ~3-5 GB, có thể 15-40 phút tuỳ mạng)"
+    # File lớn nhất (torch cho card NVIDIA, ~3.3 GB) + pynini (trên GitHub) tải trước bằng curl -> tải tiếp được khi đứt.
+    $GOI = "$GOC\goi_tai"
+    New-Item -ItemType Directory -Force $GOI | Out-Null
+    $TORCH = "$GOI\torch-2.7.1+cu128-cp310-cp310-win_amd64.whl"
+    $PYNINI = "$GOI\pynini-2.1.6.post1-cp310-cp310-win_amd64.whl"
+    Write-Host "Tải torch (~3.3 GB, tải tiếp được khi mạng đứt)..."
+    TaiFile "https://download-r2.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp310-cp310-win_amd64.whl" $TORCH "5174f02de8ca14df87c8e333c4c39cf3ce93a323c9d470d690301d110a053b3c"
+    TaiFile "https://github.com/billwuhao/pynini-windows-wheels/releases/download/v2.1.6.post1/pynini-2.1.6.post1-cp310-cp310-win_amd64.whl" $PYNINI "18be20f369f86355a12f9bad76bd17f1235df32cd72df6564f068b0e4f4f1911"
+    $env:UV_HTTP_TIMEOUT = "600"; $env:UV_HTTP_RETRIES = "10"
     Push-Location "$GOC\pyvideotrans"
-    # --frozen: dùng đúng danh sách phiên bản đã khoá, không phải hỏi lại GitHub.
-    # Bỏ qua giọng đọc Chatterbox (tool không dùng; thư viện của nó phải tải qua Git từ GitHub, mạng VN hay đứt).
-    # Mạng chập chờn -> tự thử lại tối đa 3 lần (phần đã tải được giữ lại, lần sau nhanh hơn).
-    $env:GIT_CONFIG_COUNT = "1"; $env:GIT_CONFIG_KEY_0 = "http.version"; $env:GIT_CONFIG_VALUE_0 = "HTTP/1.1"
-    $ok = $false
     foreach ($lan in 1..3) {
-        uv sync --frozen --no-install-package resemble-perth --no-install-package chatterbox-tts
+        if (Test-Path ".venv\Scripts\python.exe") { break }
+        uv venv --python 3.10 .venv
+        if ($LASTEXITCODE -ne 0) { Write-Host "Tải Python lỗi - thử lại sau 10 giây..." -ForegroundColor Yellow; Start-Sleep -Seconds 10 }
+    }
+    if (-not (Test-Path ".venv\Scripts\python.exe")) { throw "Không tải được Python 3.10 (mạng không ổn định - thử lại sau hoặc đổi mạng/4G)" }
+    # Danh sách thư viện đúng phiên bản đã khoá; bỏ giọng Chatterbox (không dùng, phải tải qua Git);
+    # torch + pynini lấy từ file đã tải sẵn.
+    uv export --frozen --no-hashes --no-emit-project --no-dev --no-emit-package resemble-perth --no-emit-package chatterbox-tts -o "$GOI\thu_vien.txt"
+    if ($LASTEXITCODE -ne 0) { throw "Không đọc được danh sách thư viện của pyVideoTrans" }
+    $uriTorch = ([System.Uri]$TORCH).AbsoluteUri
+    $uriPynini = ([System.Uri]$PYNINI).AbsoluteUri
+    $ds = Get-Content "$GOI\thu_vien.txt" | ForEach-Object {
+        if ($_ -match '^torch==2\.7\.1\+cu128') { "torch @ $uriTorch ; sys_platform == 'win32'" }
+        elseif ($_ -match '^pynini @ ') { "pynini @ $uriPynini ; sys_platform == 'win32'" }
+        else { $_ }
+    }
+    [System.IO.File]::WriteAllLines("$GOI\thu_vien_win.txt", $ds)
+    $env:VIRTUAL_ENV = "$GOC\pyvideotrans\.venv"
+    # Mạng chập chờn -> tự thử lại (các gói đã tải xong được giữ trong bộ nhớ đệm, lần sau không tải lại).
+    $ok = $false
+    foreach ($lan in 1..5) {
+        # --no-deps: cài đúng y danh sách đã khoá (đã gồm mọi thư viện phụ), không giải lại phiên bản
+        uv pip install -r "$GOI\thu_vien_win.txt" --no-deps --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
         if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-        Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/3 sau 10 giây..." -ForegroundColor Yellow
+        Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/5 sau 10 giây (gói đã tải xong được giữ)..." -ForegroundColor Yellow
         Start-Sleep -Seconds 10
     }
-    if (-not $ok) { throw "uv sync lỗi (mạng tới GitHub/PyPI không ổn định - thử lại sau hoặc đổi mạng/4G)" }
+    Remove-Item Env:VIRTUAL_ENV
+    if (-not $ok) { throw "Cài thư viện lỗi (mạng không ổn định). Chạy lại CaiDat.bat - phần đã tải được giữ lại." }
     # tạo file cài đặt mặc định của pyVideoTrans (cảnh báo của Python không phải lỗi -> bỏ qua)
     $ErrorActionPreference = "Continue"
     & ".venv\Scripts\python.exe" -c "from videotrans.configure import config" *> $null
@@ -106,7 +155,8 @@ try {
     $env:VIRTUAL_ENV = "$GOC\.venv_tool"
     $ok = $false
     foreach ($lan in 1..3) {
-        uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp torch==2.7.0
+        # dùng chung file torch đã tải (bản cho card NVIDIA) -> AI xoá chữ / làm nét chạy bằng GPU nếu có
+        uv pip install rapidocr onnxruntime opencv-python-headless numpy requests yt-dlp "$TORCH" --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
         if ($LASTEXITCODE -eq 0) { $ok = $true; break }
         Write-Host "Mạng bị ngắt khi tải thư viện - thử lại lần $($lan + 1)/3 sau 10 giây..." -ForegroundColor Yellow
         Start-Sleep -Seconds 10
