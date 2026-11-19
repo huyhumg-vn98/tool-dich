@@ -10,6 +10,7 @@ Cách làm (theo dõi từng dòng chữ gốc):
 5. Mỗi câu tiếng Việt đặt vào đúng chỗ dòng chữ gốc đang hiện cùng lúc.
 """
 import difflib
+from collections import Counter
 import json
 import os
 import re
@@ -126,7 +127,7 @@ def tim_lan(mau_thu, W, H):
     lặp lại đúng một chỗ, nên bị loại.
     """
     o = H / 100
-    dem, cao = {}, {}
+    dem, cao, chu = {}, {}, {}
     for _, hop in mau_thu:
         da = set()
         for h in hop:
@@ -138,6 +139,7 @@ def tim_lan(mau_thu, W, H):
             da.add(k)
             dem[k] = dem.get(k, 0) + 1
             cao.setdefault(k, []).append(h[3] - h[1])
+            chu.setdefault(k, []).append(re.sub(r"[\W_]", "", h[4]))
     can = max(3, 0.05 * len(mau_thu))
     lan = []
     for k in sorted(dem, key=dem.get, reverse=True):
@@ -146,6 +148,10 @@ def tim_lan(mau_thu, W, H):
             break
         cac = cao[k] + cao.get(k - 1, []) + cao.get(k + 1, [])
         c_k = float(np.median(cac))
+        # chữ đứng yên cả video, nội dung không đổi (cảnh báo "请勿模仿", tên kênh...) -> không phải phụ đề
+        ds = chu.get(k, []) + chu.get(k - 1, []) + chu.get(k + 1, [])
+        if len(ds) >= 0.5 * len(mau_thu) and Counter(ds).most_common(1)[0][1] >= 0.7 * len(ds):
+            continue
         if any(abs((k + 0.5) * o - y) < 0.8 * max(c, c_k) for y, c in lan):
             continue       # trùng làn đã có
         lan.append(((k + 0.5) * o, c_k))
